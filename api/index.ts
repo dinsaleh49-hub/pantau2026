@@ -27,18 +27,26 @@ if (!fs.existsSync(DATA_DIR) && !process.env.VERCEL) {
 const getHealth = async (req: any, res: any) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   let supabaseStatus = "not_configured";
+  let supabaseError = null;
   if (supabase) {
     try {
       const { error } = await supabase.from('epantau_storage').select('id').limit(1);
-      supabaseStatus = error ? "error" : "connected";
-    } catch (e) {
+      if (error) {
+        supabaseStatus = "error";
+        supabaseError = error.message;
+      } else {
+        supabaseStatus = "connected";
+      }
+    } catch (e: any) {
       supabaseStatus = "exception";
+      supabaseError = e.message;
     }
   }
   res.json({ 
     status: "ok", 
     persistence: supabase ? "supabase" : "local_file",
     supabase_status: supabaseStatus,
+    supabase_error: supabaseError,
     is_vercel: !!process.env.VERCEL,
     url: req.url,
     path: req.path

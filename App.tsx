@@ -520,6 +520,9 @@ const App: React.FC = () => {
                 <p className={`text-[9px] font-bold flex items-center gap-1 ${supabaseStatus === 'connected' ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {supabaseStatus === 'connected' ? <CheckBadgeIcon className="h-3 w-3" /> : <ExclamationTriangleIcon className="h-3 w-3" />}
                   Supabase: {supabaseStatus === 'connected' ? 'Berhubung & Aktif' : `Masalah Sambungan (${supabaseStatus})`}
+                  {supabaseStatus !== 'connected' && syncError && (
+                    <span className="text-red-500 ml-1">[{syncError}]</span>
+                  )}
                 </p>
                 <button 
                   onClick={handleManualSync}

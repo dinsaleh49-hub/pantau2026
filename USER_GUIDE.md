@@ -89,8 +89,24 @@ Export all raw data to a CSV file for further analysis in Excel or other tools.
 *   **Bulk Export:** Export an entire department's records to organized sub-folders in Google Drive.
 *   **Admin Folder:** Access the digital archive directly via the "Folder Admin" link.
 
-### 5.2 Local Storage
-The system automatically saves data to your browser's local storage. However, it is recommended to use the **Google Drive Sync** or **CSV Export** for permanent backups.
+### 5.2 Supabase Cloud Persistence
+The system uses Supabase for real-time data persistence across devices. If you see a **"Masalah Sambungan"** error, ensure the following:
+
+1.  **Environment Variables:** `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` must be set in the project settings.
+2.  **Database Table:** You must create a table named `epantau_storage` in your Supabase project with the following SQL:
+    ```sql
+    create table epantau_storage (
+      id text primary key,
+      content jsonb not null,
+      updated_at timestamp with time zone default now()
+    );
+    
+    -- Enable Row Level Security (RLS) if needed, 
+    -- or ensure the Service Role Key is used for bypass.
+    ```
+
+### 5.3 Local Storage
+The system automatically saves data to your browser's local storage as a fallback. However, it is recommended to use **Supabase** or **CSV Export** for permanent backups.
 
 ---
 
