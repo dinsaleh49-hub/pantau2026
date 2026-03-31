@@ -41,6 +41,7 @@ export interface MonitoringSchedule {
   time: string;
   location: string;
   timestamp: number;
+  status: 'Pending' | 'Completed' | 'Cancelled';
 }
 
 export interface DashboardStats {

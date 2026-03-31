@@ -139,7 +139,7 @@ export const Dashboard: React.FC<Props> = ({
       .filter(l => selectedDeptFilter === 'all' || l.department === selectedDeptFilter)
       .filter(l => !onlyKJ || l.name.includes('(KJ)'))
       .map(lec => {
-        const lecturerRecords = records.filter(r => r.lecturerName === lec.name);
+        const lecturerRecords = records.filter(r => r.lecturerName.toLowerCase() === lec.name.toLowerCase());
         const isMonitored = lecturerRecords.length > 0;
         
         let avgScore = 0;
@@ -168,7 +168,7 @@ export const Dashboard: React.FC<Props> = ({
   const kjMonitoringStats = useMemo(() => {
     const allKJs = allLecturers.filter(l => l.name.includes('(KJ)'));
     const totalKJs = allKJs.length;
-    const monitoredKJs = allKJs.filter(kj => records.some(r => r.lecturerName === kj.name));
+    const monitoredKJs = allKJs.filter(kj => records.some(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()));
     const monitoredCount = monitoredKJs.length;
     const percentage = totalKJs > 0 ? Math.round((monitoredCount / totalKJs) * 100) : 0;
 
@@ -176,7 +176,7 @@ export const Dashboard: React.FC<Props> = ({
       total: totalKJs,
       monitored: monitoredCount,
       percentage,
-      unmonitored: allKJs.filter(kj => !records.some(r => r.lecturerName === kj.name))
+      unmonitored: allKJs.filter(kj => !records.some(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()))
     };
   }, [records, allLecturers]);
 
@@ -221,11 +221,10 @@ export const Dashboard: React.FC<Props> = ({
   }, [schedules, scheduleDeptFilter, onlyKJSchedule]);
 
   const upcomingSchedules = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
     return schedules
-      .filter(s => s.date >= today)
+      .filter(s => s.status === 'Pending')
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .slice(0, 3);
+      .slice(0, 5);
   }, [schedules]);
 
   const activeDepartments = useMemo(() => {
@@ -237,7 +236,7 @@ export const Dashboard: React.FC<Props> = ({
     return activeDepartments.map(dept => {
       const lecturersInDept = allLecturers.filter(l => l.department === dept);
       const totalInDept = lecturersInDept.length;
-      const monitoredLecturers = lecturersInDept.filter(l => records.some(r => r.lecturerName === l.name));
+      const monitoredLecturers = lecturersInDept.filter(l => records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()));
       const monitoredCount = monitoredLecturers.length;
       const percentage = totalInDept > 0 ? Math.round((monitoredCount / totalInDept) * 100) : 0;
 
@@ -452,11 +451,13 @@ export const Dashboard: React.FC<Props> = ({
     const lecturer = allLecturers.find(l => l.name === schedForm.lecturerName);
     if (!lecturer) return;
     if (editingScheduleId) {
+      const existing = schedules.find(s => s.id === editingScheduleId);
       const updated: MonitoringSchedule = {
         ...schedForm,
         id: editingScheduleId,
         department: lecturer.department,
-        timestamp: schedules.find(s => s.id === editingScheduleId)?.timestamp || Date.now()
+        timestamp: existing?.timestamp || Date.now(),
+        status: existing?.status || 'Pending'
       };
       onUpdateSchedule(updated);
     } else {
@@ -464,7 +465,8 @@ export const Dashboard: React.FC<Props> = ({
         ...schedForm,
         id: Math.random().toString(36).substr(2, 9),
         department: lecturer.department,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        status: 'Pending'
       };
       onAddSchedule(newSched);
     }

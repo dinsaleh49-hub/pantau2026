@@ -344,25 +344,33 @@ const App: React.FC = () => {
   });
 
   const handleAddRecord = (record: EvaluationRecord) => {
-    if (user?.role !== 'admin') {
-      alert('Hanya Admin dibenarkan menyimpan laporan pemantauan.');
-      return;
-    }
-
     // Automatically add lecturer to list if they don't exist
-    const lecturerExists = lecturersList.some(l => l.name.toLowerCase() === record.lecturerName.toLowerCase());
-    if (!lecturerExists && record.lecturerName.trim()) {
-      setLecturersList(prev => [...prev, { 
-        name: record.lecturerName.trim(), 
+    const trimmedName = record.lecturerName.trim();
+    const normalizedRecord = { ...record, lecturerName: trimmedName };
+    
+    const lecturerExists = lecturersList.some(l => l.name.toLowerCase() === trimmedName.toLowerCase());
+    if (!lecturerExists && trimmedName) {
+      const newLecturer = { 
+        name: trimmedName, 
         department: record.department 
-      }]);
+      };
+      setLecturersList(prev => [...prev, newLecturer]);
     }
 
     setRecords((prev: EvaluationRecord[]) => {
       const exists = prev.some((r: EvaluationRecord) => r.id === record.id);
-      if (exists) return prev.map((r: EvaluationRecord) => r.id === record.id ? record : r);
-      return [record, ...prev];
+      if (exists) return prev.map((r: EvaluationRecord) => r.id === record.id ? normalizedRecord : r);
+      return [normalizedRecord, ...prev];
     });
+
+    // If there's a matching schedule, mark it as completed
+    setSchedules((prev: MonitoringSchedule[]) => 
+      prev.map(s => (s.lecturerName.toLowerCase() === normalizedRecord.lecturerName.toLowerCase() && s.date === normalizedRecord.date) 
+        ? { ...s, status: 'Completed' as const } 
+        : s
+      )
+    );
+
     setEditingRecord(null);
     setView('dashboard');
   };

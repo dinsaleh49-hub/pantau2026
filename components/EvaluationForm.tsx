@@ -59,7 +59,7 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
       const isKnownCourse = COMMON_COURSES.some(c => c.code === initialData.code && c.name === initialData.course);
       setIsOtherCourse(!isKnownCourse && !!initialData.code);
 
-      const isKnownLecturer = lecturers.some(l => l.name === initialData.lecturerName);
+      const isKnownLecturer = lecturers.some(l => l.name.toLowerCase() === initialData.lecturerName.toLowerCase());
       setIsOtherLecturer(!isKnownLecturer && !!initialData.lecturerName);
       
       const isKnownDept = DEPARTMENTS.includes(initialData.department);
@@ -76,13 +76,13 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
   }, [initialData]);
 
   const handleLecturerChange = (name: string) => {
-    const lecturer = lecturers.find(l => l.name === name);
+    const lecturer = lecturers.find(l => l.name.toLowerCase() === name.toLowerCase());
     if (lecturer) {
       setIsOtherLecturer(false);
       setIsOtherDepartment(false);
       setFormData((prev) => ({
         ...prev,
-        lecturerName: name,
+        lecturerName: lecturer.name, // Use the canonical name from the list
         department: lecturer.department
       }));
     } else {
