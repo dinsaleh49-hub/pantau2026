@@ -71,7 +71,7 @@ export const LECTURERS = [
 { name: 'Dr. Syakima Ilyana binti Ibrahim',	department: 'Jabatan Sains' },
 { name: 'Dr. Syamsiah binti Mokhtar',	department:	'Jabatan Ilmu Pendidikan' },
 { name: 'Dr. Tengku Nor Husna binti Tengku Jamil (KJ)',	department:	'Jabatan Pendidikan Islam' },
-{ name: 'Dr. Thiru Kali Thevi a/p A.Jayaraman',	department: 'Jabatan Pendidikan Jasmani dan Kokurikulums' },
+{ name: 'Dr. Thiru Kali Thevi a/p A.Jayaraman',	department: 'Jabatan Pendidikan Jasmani dan Kokurikulum' },
 { name: 'Dr. Vadivelan a/l Lohonathan',	department:	'Jabatan Pendidikan Jasmani dan Kokurikulum' },
 { name: 'Dr. Vani a/p Perumal',	department:	'Jabatan Matematik' },
 { name: 'Dr. Zaitun binti Ghazali (KJ)',	department: 'Jabatan Sains' },
