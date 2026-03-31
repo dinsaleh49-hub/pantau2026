@@ -268,6 +268,11 @@ export const Dashboard: React.FC<Props> = ({
         r.lecturerName.toLowerCase() === l.name.toLowerCase() && 
         r.department === l.department
       ));
+      
+      const newMonitoredInDept = monitoredLecturers.filter(l => 
+        !LECTURERS.some(staticL => staticL.name.toLowerCase() === l.name.toLowerCase())
+      );
+
       const monitoredCount = monitoredLecturers.length;
       const percentage = totalInDept > 0 ? Math.round((monitoredCount / totalInDept) * 100) : 0;
  
@@ -283,7 +288,8 @@ export const Dashboard: React.FC<Props> = ({
         monitored: monitoredCount,
         percentage,
         kjMonitored,
-        unmonitoredNames: unmonitoredLecturers.map(l => l.name)
+        unmonitoredNames: unmonitoredLecturers.map(l => l.name),
+        newMonitoredNames: newMonitoredInDept.map(l => l.name)
       };
     }).sort((a, b) => b.percentage - a.percentage);
   }, [records, allLecturers, activeDepartments]);
@@ -622,9 +628,16 @@ export const Dashboard: React.FC<Props> = ({
               <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl"><UsersIcon className="h-6 w-6"/></div>
               <div>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status Pemantauan</p>
-                <p className="text-xl font-black text-slate-900">
-                  {allLecturers.length - unmonitoredLecturersOverall.length}/{allLecturers.length}
-                </p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-xl font-black text-slate-900">
+                    {allLecturers.length - unmonitoredLecturersOverall.length}/{allLecturers.length}
+                  </p>
+                  {newLecturers.length > 0 && (
+                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100">
+                      +{newLecturers.length} Baru
+                    </span>
+                  )}
+                </div>
               </div>
               {unmonitoredLecturersOverall.length > 0 && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
@@ -996,6 +1009,21 @@ export const Dashboard: React.FC<Props> = ({
                     </div>
                     <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{ width: `${dept.percentage}%` }} /></div>
                     
+                    {dept.newMonitoredNames.length > 0 && (
+                      <div className="mt-2 p-2 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
+                        <p className="text-[9px] font-black text-indigo-600 uppercase mb-1 flex items-center gap-1">
+                          <SparklesIcon className="h-2.5 w-2.5" /> Baru Selesai ({dept.newMonitoredNames.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {dept.newMonitoredNames.map(name => (
+                            <span key={name} className="px-1.5 py-0.5 bg-white border border-indigo-100 text-[9px] font-bold text-indigo-700 rounded-md">
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {dept.unmonitoredNames.length > 0 && (
                       <div className="mt-3 p-3 bg-rose-50/50 rounded-xl border border-rose-100/50">
                         <p className="text-[10px] font-black text-rose-600 uppercase mb-2 flex items-center gap-1">
@@ -1263,12 +1291,20 @@ export const Dashboard: React.FC<Props> = ({
                   <div className="space-y-1.5">
                     {allLecturers
                       .filter(l => l.department === selectedDeptDetails && records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()))
-                      .map(l => (
-                        <div key={l.name} className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl flex items-center justify-between">
-                          <span className="text-xs font-bold text-emerald-900">{l.name}</span>
-                          <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">Selesai</span>
-                        </div>
-                      ))}
+                      .map(l => {
+                        const isNew = !LECTURERS.some(staticL => staticL.name.toLowerCase() === l.name.toLowerCase());
+                        return (
+                          <div key={l.name} className={`p-3 border rounded-xl flex items-center justify-between ${isNew ? 'bg-indigo-50/50 border-indigo-100' : 'bg-emerald-50/50 border-emerald-100'}`}>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-bold ${isNew ? 'text-indigo-900' : 'text-emerald-900'}`}>{l.name}</span>
+                              {isNew && <SparklesIcon className="h-3 w-3 text-indigo-500" />}
+                            </div>
+                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${isNew ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {isNew ? 'Baru' : 'Selesai'}
+                            </span>
+                          </div>
+                        );
+                      })}
                     {allLecturers.filter(l => l.department === selectedDeptDetails && records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase())).length === 0 && (
                       <p className="text-xs text-slate-400 italic">Tiada rekod.</p>
                     )}
