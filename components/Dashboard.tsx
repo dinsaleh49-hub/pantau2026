@@ -679,15 +679,19 @@ export const Dashboard: React.FC<Props> = ({
                             <button onClick={() => generatePDF(record, 'view')} className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs font-bold hover:bg-slate-50 transition-colors"><PrinterIcon className="h-3.5 w-3.5" /> Cetak</button>
                             <button onClick={() => generateAISummary(record)} className="flex items-center gap-1 px-2 py-1 bg-amber-500 text-white rounded text-xs font-bold hover:bg-amber-600 transition-colors"><SparklesIcon className="h-3.5 w-3.5" /> Rumusan</button>
                             <button onClick={() => generatePDF(record, 'save')} className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-100 transition-colors"><ArrowDownTrayIcon className="h-3.5 w-3.5" /> Muat Turun</button>
-                            <button onClick={() => onEditRecord(record)} className="p-1.5 text-slate-400 hover:text-emerald-600"><PencilSquareIcon className="h-4 w-4" /></button>
-                            <button 
-                              onClick={() => handleSaveToDrive(record)} 
-                              className={`p-1.5 transition-colors ${isSavingToDrive === record.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
-                              title="Simpan ke Folder Google Drive Admin"
-                            >
-                              <CloudArrowUpIcon className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => onDeleteRecord(record.id)} className="p-1.5 text-slate-400 hover:text-rose-600"><TrashIcon className="h-4 w-4" /></button>
+                            {isAdminView && (
+                              <>
+                                <button onClick={() => onEditRecord(record)} className="p-1.5 text-slate-400 hover:text-emerald-600"><PencilSquareIcon className="h-4 w-4" /></button>
+                                <button 
+                                  onClick={() => handleSaveToDrive(record)} 
+                                  className={`p-1.5 transition-colors ${isSavingToDrive === record.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
+                                  title="Simpan ke Folder Google Drive Admin"
+                                >
+                                  <CloudArrowUpIcon className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => onDeleteRecord(record.id)} className="p-1.5 text-slate-400 hover:text-rose-600"><TrashIcon className="h-4 w-4" /></button>
+                              </>
+                            )}
                           </td>
                         </tr>
                       );
@@ -833,14 +837,18 @@ export const Dashboard: React.FC<Props> = ({
                                <PrinterIcon className="h-3 w-3" /> Cetak
                              </button>
                              <button onClick={() => generateAISummary(item.name)} className="p-1.5 text-amber-500 hover:text-amber-600" title="Rumusan AI"><SparklesIcon className="h-4 w-4" /></button>
-                             <button onClick={() => onEditRecord(item.latestRecord!)} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
-                             <button 
-                              onClick={() => handleSaveToDrive(item.latestRecord!)} 
-                              className={`p-1.5 transition-colors ${isSavingToDrive === item.latestRecord!.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
-                              title="Simpan ke Folder Google Drive Admin"
-                             >
-                                <CloudArrowUpIcon className="h-4 w-4" />
-                             </button>
+                             {isAdminView && (
+                               <>
+                                 <button onClick={() => onEditRecord(item.latestRecord!)} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
+                                 <button 
+                                  onClick={() => handleSaveToDrive(item.latestRecord!)} 
+                                  className={`p-1.5 transition-colors ${isSavingToDrive === item.latestRecord!.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
+                                  title="Simpan ke Folder Google Drive Admin"
+                                 >
+                                    <CloudArrowUpIcon className="h-4 w-4" />
+                                 </button>
+                               </>
+                             )}
                              <button 
                                onClick={() => generatePDF(item.latestRecord!, 'save')} 
                                className="flex items-center gap-1 px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-[10px] font-bold hover:bg-indigo-100 transition-colors"
@@ -850,7 +858,9 @@ export const Dashboard: React.FC<Props> = ({
                            </>
                          )}
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
-                         <button onClick={() => onDeleteLecturer(item.name)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
+                         {isAdminView && (
+                           <button onClick={() => onDeleteLecturer(item.name)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
+                         )}
                       </td>
                     </tr>
                   ))}
@@ -902,12 +912,16 @@ export const Dashboard: React.FC<Props> = ({
                     </div>
                     
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEditSchedule(s)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm">
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => onDeleteSchedule(s.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm">
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      {isAdminView && (
+                        <>
+                          <button onClick={() => handleEditSchedule(s)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm">
+                            <PencilSquareIcon className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => onDeleteSchedule(s.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm">
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-1 mb-4">

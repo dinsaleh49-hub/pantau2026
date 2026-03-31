@@ -294,6 +294,10 @@ const App: React.FC = () => {
   });
 
   const handleAddRecord = (record: EvaluationRecord) => {
+    if (user?.role !== 'admin') {
+      alert('Hanya Admin dibenarkan menyimpan laporan pemantauan.');
+      return;
+    }
     setRecords((prev: EvaluationRecord[]) => {
       const exists = prev.some((r: EvaluationRecord) => r.id === record.id);
       if (exists) return prev.map((r: EvaluationRecord) => r.id === record.id ? record : r);
@@ -348,6 +352,11 @@ const App: React.FC = () => {
   };
 
   const handleConfirmedDelete = () => {
+    if (user?.role !== 'admin' && (confirmModal.type === 'record' || confirmModal.type === 'lecturer')) {
+      alert('Hanya Admin dibenarkan memadam rekod atau pensyarah.');
+      setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      return;
+    }
     if (confirmModal.type === 'record' && confirmModal.targetId) {
       setRecords((prev: EvaluationRecord[]) => prev.filter((r: EvaluationRecord) => r.id !== confirmModal.targetId));
     } else if (confirmModal.type === 'lecturer' && confirmModal.targetId) {
@@ -416,8 +425,8 @@ const App: React.FC = () => {
                   Dashboard
                 </button>
                 
-                {/* Restricted users cannot access the Evaluation Form */}
-                {!isRestrictedUser && (
+                {/* Only admins can access the Evaluation Form */}
+                {user.role === 'admin' && (
                   <button
                     onClick={() => { setEditingRecord(null); setView('form'); }}
                     className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
@@ -459,7 +468,7 @@ const App: React.FC = () => {
             onRefresh={() => fetchData()}
             lastSync={lastSync}
           />
-        ) : !isRestrictedUser ? (
+        ) : user.role === 'admin' ? (
           <div className="max-w-4xl mx-auto">
             <button 
               onClick={() => { setView('dashboard'); setEditingRecord(null); }}
@@ -480,6 +489,7 @@ const App: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
              <ExclamationTriangleIcon className="h-12 w-12 mb-4" />
              <p className="font-bold">Akses Dilarang</p>
+             <p className="text-xs mt-2">Hanya Admin dibenarkan menyimpan laporan pemantauan.</p>
           </div>
         )}
       </main>
