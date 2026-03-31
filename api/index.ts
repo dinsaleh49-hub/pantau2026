@@ -18,6 +18,7 @@ app.use(express.json({ limit: '50mb' }));
 const DATA_DIR = path.join(process.cwd(), "data");
 const RECORDS_FILE = path.join(DATA_DIR, "records.json");
 const SCHEDULES_FILE = path.join(DATA_DIR, "schedules.json");
+const LECTURERS_FILE = path.join(DATA_DIR, "lecturers.json");
 
 if (!fs.existsSync(DATA_DIR) && !process.env.VERCEL) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
@@ -127,6 +128,43 @@ const postSchedules = async (req: any, res: any) => {
   }
 };
 
+const getLecturers = async (req: any, res: any) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('epantau_storage').select('content').eq('id', 'lecturers').maybeSingle();
+      if (error) throw error;
+      return res.json(data?.content || []);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  } else {
+    try {
+      if (fs.existsSync(LECTURERS_FILE)) {
+        return res.json(JSON.parse(fs.readFileSync(LECTURERS_FILE, "utf-8")));
+      }
+      res.json([]);
+    } catch (e) { res.json([]); }
+  }
+};
+
+const postLecturers = async (req: any, res: any) => {
+  const lecturers = req.body;
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('epantau_storage').upsert({ id: 'lecturers', content: lecturers, updated_at: new Date() });
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    if (process.env.VERCEL) return res.status(503).json({ error: "Supabase required for Vercel persistence" });
+    fs.writeFileSync(LECTURERS_FILE, JSON.stringify(lecturers, null, 2));
+    res.json({ success: true });
+  }
+};
+
 // Register routes with and without /api prefix
 app.get("/api/health", getHealth);
 app.get("/health", getHealth);
@@ -140,6 +178,11 @@ app.get("/api/schedules", getSchedules);
 app.get("/schedules", getSchedules);
 app.post("/api/schedules", postSchedules);
 app.post("/schedules", postSchedules);
+
+app.get("/api/lecturers", getLecturers);
+app.get("/lecturers", getLecturers);
+app.post("/api/lecturers", postLecturers);
+app.post("/lecturers", postLecturers);
 
 // Catch-all for API function
 app.use((req, res) => {

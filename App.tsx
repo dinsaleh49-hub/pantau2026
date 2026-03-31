@@ -92,9 +92,10 @@ const App: React.FC = () => {
     if (isLocalUpdate && isSilent) return; // Don't poll if we have unsynced local changes
     if (!isSilent) setIsSyncing(true);
     try {
-      const [recordsRes, schedulesRes, healthRes] = await Promise.all([
+      const [recordsRes, schedulesRes, lecturersRes, healthRes] = await Promise.all([
         fetch('/api/records'),
         fetch('/api/schedules'),
+        fetch('/api/lecturers'),
         fetch('/api/health')
       ]);
       
@@ -151,6 +152,26 @@ const App: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(localSchedules)
+              }).catch(console.error);
+            }
+          }
+        }
+      }
+
+      if (lecturersRes.ok) {
+        const lecturersData = await lecturersRes.json();
+        if (Array.isArray(lecturersData)) {
+          if (lecturersData.length > 0 || !isInitialLoad.current) {
+            setLecturersList(lecturersData);
+          } else if (isInitialLoad.current) {
+            const saved = localStorage.getItem('ipgkpt_lecturers');
+            if (saved) {
+              const localLecturers = JSON.parse(saved);
+              setLecturersList(localLecturers);
+              fetch('/api/lecturers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(localLecturers)
               }).catch(console.error);
             }
           }
@@ -237,7 +258,31 @@ const App: React.FC = () => {
   }, [schedules]);
 
   useEffect(() => {
+    if (isInitialLoad.current) return;
+
     localStorage.setItem('ipgkpt_lecturers', JSON.stringify(lecturersList));
+    
+    const syncLecturers = async () => {
+      setIsLocalUpdate(true);
+      try {
+        const response = await fetch('/api/lecturers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(lecturersList)
+        });
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Server error: ${response.status}`);
+        }
+        setSyncError(null);
+        setIsLocalUpdate(false);
+      } catch (e: any) {
+        console.error("Failed to sync lecturers:", e);
+        setSyncError(`Gagal menyimpan senarai pensyarah: ${e.message}`);
+      }
+    };
+
+    syncLecturers();
   }, [lecturersList]);
 
   const handleLogin = (userData: { username: string; department: string; role: 'admin' | 'user' }, remember: boolean) => {
@@ -264,6 +309,11 @@ const App: React.FC = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(schedules)
+        }),
+        fetch('/api/lecturers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(lecturersList)
         })
       ]);
       setLastSync(new Date());
@@ -298,6 +348,16 @@ const App: React.FC = () => {
       alert('Hanya Admin dibenarkan menyimpan laporan pemantauan.');
       return;
     }
+
+    // Automatically add lecturer to list if they don't exist
+    const lecturerExists = lecturersList.some(l => l.name.toLowerCase() === record.lecturerName.toLowerCase());
+    if (!lecturerExists && record.lecturerName.trim()) {
+      setLecturersList(prev => [...prev, { 
+        name: record.lecturerName.trim(), 
+        department: record.department 
+      }]);
+    }
+
     setRecords((prev: EvaluationRecord[]) => {
       const exists = prev.some((r: EvaluationRecord) => r.id === record.id);
       if (exists) return prev.map((r: EvaluationRecord) => r.id === record.id ? record : r);
@@ -318,6 +378,33 @@ const App: React.FC = () => {
   const handleEditRecord = (record: EvaluationRecord) => {
     setEditingRecord(record);
     setView('form');
+  };
+
+  const handleUpdateLecturer = (oldName: string, updatedLecturer: Lecturer) => {
+    if (user?.role !== 'admin') {
+      alert('Hanya Admin dibenarkan mengemaskini maklumat pensyarah.');
+      return;
+    }
+    setLecturersList(prev => prev.map(l => l.name === oldName ? updatedLecturer : l));
+    // Update records if name changed
+    if (oldName !== updatedLecturer.name) {
+      setRecords(prev => prev.map(r => r.lecturerName === oldName ? { ...r, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : r));
+      setSchedules(prev => prev.map(s => s.lecturerName === oldName ? { ...s, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : s));
+    }
+  };
+
+  const handleAddLecturer = (lecturer: Lecturer) => {
+    if (user?.role !== 'admin') {
+      alert('Hanya Admin dibenarkan menambah pensyarah.');
+      return;
+    }
+    setLecturersList(prev => {
+      if (prev.some(l => l.name.toLowerCase() === lecturer.name.toLowerCase())) {
+        alert('Nama pensyarah sudah wujud dalam senarai.');
+        return prev;
+      }
+      return [...prev, lecturer];
+    });
   };
 
   const openDeleteRecordConfirm = (id: string) => {
@@ -465,6 +552,8 @@ const App: React.FC = () => {
             onEditRecord={handleEditRecord}
             onAddSchedule={handleAddSchedule}
             onUpdateSchedule={handleUpdateSchedule}
+            onAddLecturer={handleAddLecturer}
+            onUpdateLecturer={handleUpdateLecturer}
             onRefresh={() => fetchData()}
             lastSync={lastSync}
           />

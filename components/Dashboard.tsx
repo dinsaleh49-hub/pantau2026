@@ -29,7 +29,8 @@ import {
   ClockIcon,
   ArchiveBoxArrowDownIcon,
   HandThumbUpIcon,
-  ExclamationCircleIcon
+  ExclamationCircleIcon,
+  UserPlusIcon
 } from '@heroicons/react/24/outline';
 import { generatePDF, generateSummaryPDF, generateFullDepartmentPDF } from '../services/pdfService';
 import { uploadToGoogleDrive } from '../services/googleDriveService';
@@ -50,6 +51,8 @@ interface Props {
   onEditRecord: (record: EvaluationRecord) => void;
   onAddSchedule: (schedule: MonitoringSchedule) => void;
   onUpdateSchedule: (schedule: MonitoringSchedule) => void;
+  onAddLecturer: (lecturer: { name: string; department: string }) => void;
+  onUpdateLecturer: (oldName: string, updatedLecturer: { name: string; department: string }) => void;
   onRefresh?: () => void;
   lastSync?: Date | null;
 }
@@ -77,6 +80,8 @@ export const Dashboard: React.FC<Props> = ({
   onEditRecord,
   onAddSchedule,
   onUpdateSchedule,
+  onAddLecturer,
+  onUpdateLecturer,
   onRefresh,
   lastSync
 }) => {
@@ -103,6 +108,9 @@ export const Dashboard: React.FC<Props> = ({
   const [showAIModal, setShowAIModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showLecturerModal, setShowLecturerModal] = useState(false);
+  const [editingLecturer, setEditingLecturer] = useState<{ name: string; department: string } | null>(null);
+  const [lecturerFormData, setLecturerFormData] = useState({ name: '', department: '' });
   const [activeLecturer, setActiveLecturer] = useState('');
   
   const [isSavingToDrive, setIsSavingToDrive] = useState<string | null>(null);
@@ -389,6 +397,28 @@ export const Dashboard: React.FC<Props> = ({
     } finally {
       setIsSummarizing(false);
     }
+  };
+
+  const handleNewLecturer = () => {
+    setEditingLecturer(null);
+    setLecturerFormData({ name: '', department: '' });
+    setShowLecturerModal(true);
+  };
+
+  const handleEditLecturer = (lec: { name: string; department: string }) => {
+    setEditingLecturer(lec);
+    setLecturerFormData({ name: lec.name, department: lec.department });
+    setShowLecturerModal(true);
+  };
+
+  const handleLecturerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingLecturer) {
+      onUpdateLecturer(editingLecturer.name, lecturerFormData);
+    } else {
+      onAddLecturer(lecturerFormData);
+    }
+    setShowLecturerModal(false);
   };
 
   const handleEditSchedule = (s: MonitoringSchedule) => {
@@ -782,6 +812,15 @@ export const Dashboard: React.FC<Props> = ({
             <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <h3 className="text-xl font-bold text-slate-800 whitespace-nowrap">Status Staf</h3>
               <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                {userRole === 'admin' && (
+                  <button 
+                    onClick={handleNewLecturer}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-all shadow-sm"
+                  >
+                    <UserPlusIcon className="h-4 w-4" />
+                    Tambah Pensyarah
+                  </button>
+                )}
                 <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
                   <input type="checkbox" checked={onlyKJ} onChange={e => setOnlyKJ(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
                   <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
@@ -859,7 +898,10 @@ export const Dashboard: React.FC<Props> = ({
                          )}
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
                          {isAdminView && (
-                           <button onClick={() => onDeleteLecturer(item.name)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
+                           <>
+                             <button onClick={() => handleEditLecturer({ name: item.name, department: item.department })} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Pensyarah"><PencilSquareIcon className="h-4 w-4" /></button>
+                             <button onClick={() => onDeleteLecturer(item.name)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
+                           </>
                          )}
                       </td>
                     </tr>
@@ -1124,6 +1166,64 @@ export const Dashboard: React.FC<Props> = ({
               <div className="pt-4 flex justify-end gap-3">
                 <button type="button" onClick={() => setShowScheduleModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">Batal</button>
                 <button type="submit" className="px-8 py-2 bg-indigo-600 text-white font-black rounded-xl text-sm shadow-lg shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95">Simpan Jadual</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showLecturerModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <AcademicCapIcon className="h-6 w-6 text-rose-600" />
+                {editingLecturer ? 'Ubahsuai Pensyarah' : 'Tambah Pensyarah Baru'}
+              </h2>
+              <button onClick={() => setShowLecturerModal(false)} className="p-2 hover:bg-white rounded-full transition-colors">
+                <XMarkIcon className="h-6 w-6 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleLecturerSubmit} className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Nama Penuh</label>
+                  <input 
+                    required
+                    type="text" 
+                    value={lecturerFormData.name}
+                    onChange={e => setLecturerFormData({...lecturerFormData, name: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all"
+                    placeholder="Contoh: Dr. Ahmad Bin Ali"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Jabatan / Unit</label>
+                  <select 
+                    required
+                    value={lecturerFormData.department}
+                    onChange={e => setLecturerFormData({...lecturerFormData, department: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all appearance-none"
+                  >
+                    <option value="" disabled>Pilih Jabatan</option>
+                    {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowLecturerModal(false)}
+                  className="flex-1 px-6 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 rounded-xl transition-all"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                >
+                  {editingLecturer ? 'Simpan Perubahan' : 'Tambah Pensyarah'}
+                </button>
               </div>
             </form>
           </div>

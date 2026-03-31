@@ -10,6 +10,7 @@ import {
 import { EvaluationRecord, Criterion } from '../types';
 import { SignaturePad } from './SignaturePad';
 import { generatePDF } from '../services/pdfService';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 
 interface Props {
   onSubmit: (record: EvaluationRecord) => void;
@@ -75,23 +76,19 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
   }, [initialData]);
 
   const handleLecturerChange = (name: string) => {
-    if (name === 'OTHER') {
-      setIsOtherLecturer(true);
-      setFormData(prev => ({ ...prev, lecturerName: '', department: '' }));
-      setIsOtherDepartment(true); // Usually if lecturer is other, dept might be too
-    } else {
+    const lecturer = lecturers.find(l => l.name === name);
+    if (lecturer) {
       setIsOtherLecturer(false);
-      const lecturer = lecturers.find(l => l.name === name);
-      if (lecturer) {
-        setIsOtherDepartment(false);
-        setFormData((prev) => ({
-          ...prev,
-          lecturerName: name,
-          department: lecturer.department
-        }));
-      } else {
-        setFormData((prev) => ({ ...prev, lecturerName: name }));
-      }
+      setIsOtherDepartment(false);
+      setFormData((prev) => ({
+        ...prev,
+        lecturerName: name,
+        department: lecturer.department
+      }));
+    } else {
+      // If name is not in list, it's a "new" lecturer
+      setIsOtherLecturer(name.trim().length > 0);
+      setFormData((prev) => ({ ...prev, lecturerName: name }));
     }
   };
 
@@ -220,25 +217,29 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Nama Pensyarah</label>
-                <select 
-                  required={!isOtherLecturer}
-                  value={isOtherLecturer ? 'OTHER' : (lecturers.some(l => l.name === formData.lecturerName) ? formData.lecturerName : '')} 
-                  onChange={e => handleLecturerChange(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm bg-white mb-2"
-                >
-                  <option value="" disabled>Pilih Nama</option>
-                  {lecturers.map(lec => <option key={lec.name} value={lec.name}>{lec.name}</option>)}
-                  <option value="OTHER">LAIN-LAIN (Tulis Manual)</option>
-                </select>
-                {isOtherLecturer && (
+                <div className="relative">
                   <input 
                     required
+                    list="lecturer-list"
                     type="text"
-                    placeholder="Masukkan Nama Pensyarah"
+                    placeholder="Cari atau Taip Nama Pensyarah..."
                     value={formData.lecturerName}
-                    onChange={e => setFormData({...formData, lecturerName: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm"
+                    onChange={e => handleLecturerChange(e.target.value)}
+                    className={`w-full px-4 py-2 border rounded-lg text-sm outline-none transition-all ${isOtherLecturer ? 'border-indigo-300 bg-indigo-50/30 ring-2 ring-indigo-100' : 'border-slate-200 bg-white focus:ring-2 focus:ring-rose-500/20'}`}
                   />
+                  <datalist id="lecturer-list">
+                    {lecturers.map(lec => <option key={lec.name} value={lec.name}>{lec.name}</option>)}
+                  </datalist>
+                </div>
+                {isOtherLecturer && !lecturers.some(l => l.name === formData.lecturerName) && (
+                  <div className="mt-2 space-y-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <p className="text-[10px] text-indigo-600 font-bold flex items-center gap-1">
+                      <SparklesIcon className="h-3 w-3" /> NAMA BARU DIKESAN
+                    </p>
+                    <p className="text-[9px] text-slate-500 italic">
+                      * Nama ini akan disimpan secara automatik ke dalam pangkalan data setelah borang dihantar.
+                    </p>
+                  </div>
                 )}
               </div>
               <div>
