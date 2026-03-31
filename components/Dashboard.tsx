@@ -46,13 +46,13 @@ interface Props {
   userRole: 'admin' | 'user';
   username?: string;
   onDeleteRecord: (id: string) => void;
-  onDeleteLecturer: (name: string) => void;
+  onDeleteLecturer: (name: string, department: string) => void;
   onDeleteSchedule: (id: string) => void;
   onEditRecord: (record: EvaluationRecord) => void;
   onAddSchedule: (schedule: MonitoringSchedule) => void;
   onUpdateSchedule: (schedule: MonitoringSchedule) => void;
   onAddLecturer: (lecturer: { name: string; department: string }) => void;
-  onUpdateLecturer: (oldName: string, updatedLecturer: { name: string; department: string }) => void;
+  onUpdateLecturer: (oldName: string, oldDept: string, updatedLecturer: { name: string; department: string }) => void;
   onRefresh?: () => void;
   lastSync?: Date | null;
 }
@@ -138,8 +138,12 @@ export const Dashboard: React.FC<Props> = ({
     return lecturers
       .filter(l => selectedDeptFilter === 'all' || l.department === selectedDeptFilter)
       .filter(l => !onlyKJ || l.name.includes('(KJ)'))
+      .filter(l => l.name.toLowerCase().includes(statusSearchTerm.toLowerCase()))
       .map(lec => {
-        const lecturerRecords = records.filter(r => r.lecturerName.toLowerCase() === lec.name.toLowerCase());
+        const lecturerRecords = records.filter(r => 
+          r.lecturerName.toLowerCase() === lec.name.toLowerCase() && 
+          r.department === lec.department
+        );
         const isMonitored = lecturerRecords.length > 0;
         
         let avgScore = 0;
@@ -168,15 +172,21 @@ export const Dashboard: React.FC<Props> = ({
   const kjMonitoringStats = useMemo(() => {
     const allKJs = allLecturers.filter(l => l.name.includes('(KJ)'));
     const totalKJs = allKJs.length;
-    const monitoredKJs = allKJs.filter(kj => records.some(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()));
+    const monitoredKJs = allKJs.filter(kj => records.some(r => 
+      r.lecturerName.toLowerCase() === kj.name.toLowerCase() && 
+      r.department === kj.department
+    ));
     const monitoredCount = monitoredKJs.length;
     const percentage = totalKJs > 0 ? Math.round((monitoredCount / totalKJs) * 100) : 0;
-
+ 
     return {
       total: totalKJs,
       monitored: monitoredCount,
       percentage,
-      unmonitored: allKJs.filter(kj => !records.some(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()))
+      unmonitored: allKJs.filter(kj => !records.some(r => 
+        r.lecturerName.toLowerCase() === kj.name.toLowerCase() && 
+        r.department === kj.department
+      ))
     };
   }, [records, allLecturers]);
 
@@ -236,12 +246,18 @@ export const Dashboard: React.FC<Props> = ({
     return activeDepartments.map(dept => {
       const lecturersInDept = allLecturers.filter(l => l.department === dept);
       const totalInDept = lecturersInDept.length;
-      const monitoredLecturers = lecturersInDept.filter(l => records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()));
+      const monitoredLecturers = lecturersInDept.filter(l => records.some(r => 
+        r.lecturerName.toLowerCase() === l.name.toLowerCase() && 
+        r.department === l.department
+      ));
       const monitoredCount = monitoredLecturers.length;
       const percentage = totalInDept > 0 ? Math.round((monitoredCount / totalInDept) * 100) : 0;
-
+ 
       const deptKJs = lecturersInDept.filter(l => l.name.includes('(KJ)'));
-      const kjMonitored = deptKJs.length > 0 && deptKJs.every(kj => records.some(r => r.lecturerName === kj.name));
+      const kjMonitored = deptKJs.length > 0 && deptKJs.every(kj => records.some(r => 
+        r.lecturerName.toLowerCase() === kj.name.toLowerCase() && 
+        r.department === kj.department
+      ));
 
       return {
         name: dept,
@@ -254,17 +270,20 @@ export const Dashboard: React.FC<Props> = ({
   }, [records, allLecturers, activeDepartments]);
 
   const lecturerStats = useMemo(() => {
-    const stats: Record<string, { total: number; count: number }> = {};
+    const stats: Record<string, { total: number; count: number; name: string; department: string }> = {};
     records.forEach(r => {
       const scores = Object.values(r.scores) as number[];
       const avg = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-      if (!stats[r.lecturerName]) stats[r.lecturerName] = { total: 0, count: 0 };
-      stats[r.lecturerName].total += avg;
-      stats[r.lecturerName].count += 1;
+      const key = `${r.lecturerName}|${r.department}`;
+      if (!stats[key]) stats[key] = { total: 0, count: 0, name: r.lecturerName, department: r.department };
+      stats[key].total += avg;
+      stats[key].count += 1;
     });
 
-    return Object.entries(stats).map(([name, data]) => ({
-      name,
+    return Object.entries(stats).map(([key, data]) => ({
+      name: data.name,
+      department: data.department,
+      displayName: `${data.name} (${data.department})`,
       value: parseFloat((data.total / data.count).toFixed(2)),
       count: data.count
     })).sort((a, b) => b.value - a.value);
@@ -338,7 +357,7 @@ export const Dashboard: React.FC<Props> = ({
     document.body.removeChild(link);
   };
 
-  const generateAISummary = async (target: EvaluationRecord | string) => {
+  const generateAISummary = async (target: EvaluationRecord | string | { name: string; department: string }) => {
     setIsSummarizing(true);
     setAiSummary(null);
     setShowAIModal(true);
@@ -349,9 +368,13 @@ export const Dashboard: React.FC<Props> = ({
     if (typeof target === 'string') {
       lecturerName = target;
       recordsToAnalyze = records.filter(r => r.lecturerName === target);
+    } else if ('name' in target && 'department' in target) {
+      lecturerName = target.name;
+      recordsToAnalyze = records.filter(r => r.lecturerName === target.name && r.department === target.department);
     } else {
-      lecturerName = target.lecturerName;
-      recordsToAnalyze = [target];
+      const record = target as EvaluationRecord;
+      lecturerName = record.lecturerName;
+      recordsToAnalyze = [record];
     }
     
     setActiveLecturer(lecturerName);
@@ -413,7 +436,7 @@ export const Dashboard: React.FC<Props> = ({
   const handleLecturerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingLecturer) {
-      onUpdateLecturer(editingLecturer.name, lecturerFormData);
+      onUpdateLecturer(editingLecturer.name, editingLecturer.department, lecturerFormData);
     } else {
       onAddLecturer(lecturerFormData);
     }
@@ -480,7 +503,7 @@ export const Dashboard: React.FC<Props> = ({
 
   const activeChartData = useMemo(() => {
     if (analysisType === 'lecturer') {
-      return lecturerStats.map(d => ({ name: d.name, value: d.value }));
+      return lecturerStats.map(d => ({ name: d.displayName, value: d.value }));
     } else {
       return departmentStats.map(d => ({ name: d.name, value: deptMetric === 'score' ? d.score : d.lecturerCount }));
     }
@@ -737,6 +760,115 @@ export const Dashboard: React.FC<Props> = ({
 
       {mainTab === 'status' && !isRestricted && (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><UsersIcon className="h-6 w-6 text-indigo-600" /> Pengurusan Pensyarah</h3>
+                <p className="text-xs text-slate-400 font-bold mt-1 uppercase">Semakan status pemantauan pensyarah mengikut jabatan</p>
+              </div>
+              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
+                  <input type="checkbox" checked={onlyKJ} onChange={e => setOnlyKJ(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
+                  <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
+                </label>
+                {(userRole === 'admin' || activeDepartments.length > 1) && (
+                  <div className="relative">
+                    <FunnelIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <select 
+                      value={selectedDeptFilter} 
+                      onChange={e => setSelectedDeptFilter(e.target.value)}
+                      className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none w-full sm:w-48 appearance-none"
+                    >
+                      <option value="all">Semua Jabatan</option>
+                      {activeDepartments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div className="relative">
+                  <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type="text" placeholder="Cari nama..." value={statusSearchTerm} onChange={e => setStatusSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+                </div>
+                {userRole === 'admin' && (
+                  <button onClick={handleNewLecturer} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-indigo-700 transition-all">
+                    <UserPlusIcon className="h-4 w-4" /> Tambah Pensyarah
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead><tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px]"><th className="px-8 py-4">Nama</th><th className="px-8 py-4">Status</th><th className="px-8 py-4 text-right">Tindakan</th></tr></thead>
+                <tbody className="divide-y divide-slate-50">
+                  {monitoringStatus.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="px-8 py-4">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-slate-800">{item.name}</p>
+                          {item.isKJ && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium">{item.department}</p>
+                      </td>
+                      <td className="px-8 py-4">
+                        {item.isMonitored ? (
+                          <div className="flex flex-col">
+                            <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded text-[10px] uppercase font-bold border border-emerald-100 inline-block w-fit">Dipantau</span>
+                            <span className="text-[10px] text-slate-400 mt-1 font-medium">Skor: {item.avgScore} ({item.count} rekod)</span>
+                          </div>
+                        ) : (
+                          <span className="text-rose-600 bg-rose-50 px-2 py-1 rounded text-[10px] uppercase font-bold border border-rose-100">Belum</span>
+                        )}
+                      </td>
+                      <td className="px-8 py-4 text-right flex justify-end gap-2 items-center">
+                         {item.isMonitored && item.latestRecord && (
+                           <>
+                             <button 
+                               onClick={() => generatePDF(item.latestRecord!, 'view')} 
+                               className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-[10px] font-bold hover:bg-slate-50 transition-colors"
+                             >
+                               <EyeIcon className="h-3 w-3" /> Lihat PDF
+                             </button>
+                             <button 
+                               onClick={() => generatePDF(item.latestRecord!, 'view')} 
+                               className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-[10px] font-bold hover:bg-slate-50 transition-colors"
+                             >
+                               <PrinterIcon className="h-3 w-3" /> Cetak
+                             </button>
+                             <button onClick={() => generateAISummary(item.name)} className="p-1.5 text-amber-500 hover:text-amber-600" title="Rumusan AI"><SparklesIcon className="h-4 w-4" /></button>
+                             {isAdminView && (
+                               <>
+                                 <button onClick={() => onEditRecord(item.latestRecord!)} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
+                                 <button 
+                                  onClick={() => handleSaveToDrive(item.latestRecord!)} 
+                                  className={`p-1.5 transition-colors ${isSavingToDrive === item.latestRecord!.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
+                                  title="Simpan ke Folder Google Drive Admin"
+                                 >
+                                    <CloudArrowUpIcon className="h-4 w-4" />
+                                 </button>
+                               </>
+                             )}
+                             <button 
+                               onClick={() => generatePDF(item.latestRecord!, 'save')} 
+                               className="flex items-center gap-1 px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-[10px] font-bold hover:bg-indigo-100 transition-colors"
+                             >
+                               <ArrowDownTrayIcon className="h-3 w-3" /> Muat Turun PDF
+                             </button>
+                           </>
+                         )}
+                         <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
+                         {isAdminView && (
+                           <>
+                             <button onClick={() => handleEditLecturer({ name: item.name, department: item.department })} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Pensyarah"><PencilSquareIcon className="h-4 w-4" /></button>
+                             <button onClick={() => onDeleteLecturer(item.name, item.department)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
+                           </>
+                         )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
               <div className="flex justify-between items-center mb-6">
@@ -807,109 +939,6 @@ export const Dashboard: React.FC<Props> = ({
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h3 className="text-xl font-bold text-slate-800 whitespace-nowrap">Status Staf</h3>
-              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                {userRole === 'admin' && (
-                  <button 
-                    onClick={handleNewLecturer}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-all shadow-sm"
-                  >
-                    <UserPlusIcon className="h-4 w-4" />
-                    Tambah Pensyarah
-                  </button>
-                )}
-                <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
-                  <input type="checkbox" checked={onlyKJ} onChange={e => setOnlyKJ(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
-                  <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
-                </label>
-                {(userRole === 'admin' || activeDepartments.length > 1) && (
-                  <div className="relative">
-                    <FunnelIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <select 
-                      value={selectedDeptFilter} 
-                      onChange={e => setSelectedDeptFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none w-full sm:w-48 appearance-none"
-                    >
-                      <option value="all">Semua Jabatan</option>
-                      {activeDepartments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
-                    </select>
-                  </div>
-                )}
-                <div className="relative">
-                  <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" placeholder="Cari nama..." value={statusSearchTerm} onChange={e => setStatusSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
-                </div>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead><tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px]"><th className="px-8 py-4">Nama</th><th className="px-8 py-4">Status</th><th className="px-8 py-4 text-right">Tindakan</th></tr></thead>
-                <tbody className="divide-y divide-slate-50">
-                  {monitoringStatus.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-8 py-4">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-slate-800">{item.name}</p>
-                          {item.isKJ && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
-                        </div>
-                        <p className="text-[10px] text-slate-400 font-medium">{item.department}</p>
-                      </td>
-                      <td className="px-8 py-4">
-                        {item.isMonitored ? <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded text-[10px] uppercase font-bold border border-emerald-100">Dipantau</span> : <span className="text-rose-600 bg-rose-50 px-2 py-1 rounded text-[10px] uppercase font-bold border border-rose-100">Belum</span>}
-                      </td>
-                      <td className="px-8 py-4 text-right flex justify-end gap-2 items-center">
-                         {item.isMonitored && item.latestRecord && (
-                           <>
-                             <button 
-                               onClick={() => generatePDF(item.latestRecord!, 'view')} 
-                               className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-[10px] font-bold hover:bg-slate-50 transition-colors"
-                             >
-                               <EyeIcon className="h-3 w-3" /> Lihat PDF
-                             </button>
-                             <button 
-                               onClick={() => generatePDF(item.latestRecord!, 'view')} 
-                               className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-[10px] font-bold hover:bg-slate-50 transition-colors"
-                             >
-                               <PrinterIcon className="h-3 w-3" /> Cetak
-                             </button>
-                             <button onClick={() => generateAISummary(item.name)} className="p-1.5 text-amber-500 hover:text-amber-600" title="Rumusan AI"><SparklesIcon className="h-4 w-4" /></button>
-                             {isAdminView && (
-                               <>
-                                 <button onClick={() => onEditRecord(item.latestRecord!)} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
-                                 <button 
-                                  onClick={() => handleSaveToDrive(item.latestRecord!)} 
-                                  className={`p-1.5 transition-colors ${isSavingToDrive === item.latestRecord!.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
-                                  title="Simpan ke Folder Google Drive Admin"
-                                 >
-                                    <CloudArrowUpIcon className="h-4 w-4" />
-                                 </button>
-                               </>
-                             )}
-                             <button 
-                               onClick={() => generatePDF(item.latestRecord!, 'save')} 
-                               className="flex items-center gap-1 px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-[10px] font-bold hover:bg-indigo-100 transition-colors"
-                             >
-                               <ArrowDownTrayIcon className="h-3 w-3" /> Muat Turun PDF
-                             </button>
-                           </>
-                         )}
-                         <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
-                         {isAdminView && (
-                           <>
-                             <button onClick={() => handleEditLecturer({ name: item.name, department: item.department })} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Pensyarah"><PencilSquareIcon className="h-4 w-4" /></button>
-                             <button onClick={() => onDeleteLecturer(item.name)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
-                           </>
-                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         </div>

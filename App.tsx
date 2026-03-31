@@ -348,7 +348,10 @@ const App: React.FC = () => {
     const trimmedName = record.lecturerName.trim();
     const normalizedRecord = { ...record, lecturerName: trimmedName };
     
-    const lecturerExists = lecturersList.some(l => l.name.toLowerCase() === trimmedName.toLowerCase());
+    const lecturerExists = lecturersList.some(l => 
+      l.name.toLowerCase() === trimmedName.toLowerCase() && 
+      l.department === record.department
+    );
     if (!lecturerExists && trimmedName) {
       const newLecturer = { 
         name: trimmedName, 
@@ -365,7 +368,11 @@ const App: React.FC = () => {
 
     // If there's a matching schedule, mark it as completed
     setSchedules((prev: MonitoringSchedule[]) => 
-      prev.map(s => (s.lecturerName.toLowerCase() === normalizedRecord.lecturerName.toLowerCase() && s.date === normalizedRecord.date) 
+      prev.map(s => (
+        s.lecturerName.toLowerCase() === normalizedRecord.lecturerName.toLowerCase() && 
+        s.department === normalizedRecord.department &&
+        s.date === normalizedRecord.date
+      ) 
         ? { ...s, status: 'Completed' as const } 
         : s
       )
@@ -388,16 +395,16 @@ const App: React.FC = () => {
     setView('form');
   };
 
-  const handleUpdateLecturer = (oldName: string, updatedLecturer: Lecturer) => {
+  const handleUpdateLecturer = (oldName: string, oldDept: string, updatedLecturer: Lecturer) => {
     if (user?.role !== 'admin') {
       alert('Hanya Admin dibenarkan mengemaskini maklumat pensyarah.');
       return;
     }
-    setLecturersList(prev => prev.map(l => l.name === oldName ? updatedLecturer : l));
-    // Update records if name changed
-    if (oldName !== updatedLecturer.name) {
-      setRecords(prev => prev.map(r => r.lecturerName === oldName ? { ...r, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : r));
-      setSchedules(prev => prev.map(s => s.lecturerName === oldName ? { ...s, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : s));
+    setLecturersList(prev => prev.map(l => (l.name === oldName && l.department === oldDept) ? updatedLecturer : l));
+    // Update records if name or department changed
+    if (oldName !== updatedLecturer.name || oldDept !== updatedLecturer.department) {
+      setRecords(prev => prev.map(r => (r.lecturerName === oldName && r.department === oldDept) ? { ...r, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : r));
+      setSchedules(prev => prev.map(s => (s.lecturerName === oldName && s.department === oldDept) ? { ...s, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : s));
     }
   };
 
@@ -426,13 +433,13 @@ const App: React.FC = () => {
     });
   };
 
-  const openDeleteLecturerConfirm = (name: string) => {
+  const openDeleteLecturerConfirm = (name: string, department: string) => {
     setConfirmModal({
       isOpen: true,
       type: 'lecturer',
-      targetId: name,
+      targetId: `${name}|${department}`,
       title: 'Padam Pensyarah?',
-      message: `Adakah anda pasti mahu memadam "${name}"? Rekod sedia ada akan KEKAL dalam arkib.`
+      message: `Adakah anda pasti mahu memadam "${name}" dari jabatan "${department}"? Rekod sedia ada akan KEKAL dalam arkib.`
     });
   };
 
@@ -455,7 +462,8 @@ const App: React.FC = () => {
     if (confirmModal.type === 'record' && confirmModal.targetId) {
       setRecords((prev: EvaluationRecord[]) => prev.filter((r: EvaluationRecord) => r.id !== confirmModal.targetId));
     } else if (confirmModal.type === 'lecturer' && confirmModal.targetId) {
-      setLecturersList((prev: Lecturer[]) => prev.filter((l: Lecturer) => l.name !== confirmModal.targetId));
+      const [name, dept] = confirmModal.targetId.split('|');
+      setLecturersList((prev: Lecturer[]) => prev.filter((l: Lecturer) => !(l.name === name && l.department === dept)));
     } else if (confirmModal.type === 'schedule' && confirmModal.targetId) {
       setSchedules((prev: MonitoringSchedule[]) => prev.filter((s: MonitoringSchedule) => s.id !== confirmModal.targetId));
     }
