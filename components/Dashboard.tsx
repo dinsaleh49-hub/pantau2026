@@ -98,6 +98,7 @@ export const Dashboard: React.FC<Props> = ({
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('all');
   const [scheduleDeptFilter, setScheduleDeptFilter] = useState<string>('all');
   const [recordsDeptFilter, setRecordsDeptFilter] = useState<string>('all');
+  const [selectedLecturerHistory, setSelectedLecturerHistory] = useState<{ name: string; records: EvaluationRecord[] } | null>(null);
   const [analysisDeptFilter, setAnalysisDeptFilter] = useState<string>('all');
   const [onlyKJ, setOnlyKJ] = useState(false);
   const [onlyKJRecords, setOnlyKJRecords] = useState(false);
@@ -170,7 +171,8 @@ export const Dashboard: React.FC<Props> = ({
           count: lecturerRecords.length,
           avgScore: parseFloat(avgScore.toFixed(2)),
           latestDate: latestRecord ? latestRecord.date : null,
-          latestRecord: latestRecord
+          latestRecord: latestRecord,
+          allRecords: lecturerRecords.sort((a, b) => b.timestamp - a.timestamp)
         };
       })
       .filter(item => item.name.toLowerCase().includes(statusSearchTerm.toLowerCase()));
@@ -910,6 +912,15 @@ export const Dashboard: React.FC<Props> = ({
                                <PrinterIcon className="h-3 w-3" /> Cetak
                              </button>
                              <button onClick={() => generateAISummary(item.name)} className="p-1.5 text-amber-500 hover:text-amber-600" title="Rumusan AI"><SparklesIcon className="h-4 w-4" /></button>
+                             {item.count > 1 && (
+                               <button 
+                                 onClick={() => setSelectedLecturerHistory({ name: item.name, records: item.allRecords })} 
+                                 className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-indigo-600 rounded text-[10px] font-bold hover:bg-indigo-50 transition-colors"
+                                 title="Lihat Sejarah Pemantauan"
+                               >
+                                 <ClockIcon className="h-3 w-3" /> Sejarah ({item.count})
+                               </button>
+                             )}
                              {isAdminView && (
                                <>
                                  <button onClick={() => onEditRecord(item.latestRecord!)} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
@@ -962,9 +973,16 @@ export const Dashboard: React.FC<Props> = ({
                     <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">KJ Sudah Dipantau</p>
                     <div className="space-y-1.5 overflow-y-auto max-h-[200px] pr-2 custom-scrollbar">
                       {allLecturers.filter(l => l.name.includes('(KJ)') && records.some(r => r.lecturerName === l.name)).map(kj => (
-                        <div key={kj.name} className="flex items-center gap-2 px-3 py-2 bg-white border border-emerald-100 rounded-xl">
-                          <CheckBadgeIcon className="h-3.5 w-3.5 text-emerald-500" />
-                          <span className="text-[11px] font-bold text-emerald-800">{kj.name}</span>
+                        <div key={kj.name} className="flex items-center justify-between px-3 py-2 bg-white border border-emerald-100 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <CheckBadgeIcon className="h-3.5 w-3.5 text-emerald-500" />
+                            <span className="text-[11px] font-bold text-emerald-800">{kj.name}</span>
+                          </div>
+                          {records.filter(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()).length > 1 && (
+                            <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">
+                              {records.filter(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()).length} Rekod
+                            </span>
+                          )}
                         </div>
                       ))}
                       {allLecturers.filter(l => l.name.includes('(KJ)') && records.some(r => r.lecturerName === l.name)).length === 0 && (
@@ -1300,7 +1318,7 @@ export const Dashboard: React.FC<Props> = ({
                               {isNew && <SparklesIcon className="h-3 w-3 text-indigo-500" />}
                             </div>
                             <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${isNew ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                              {isNew ? 'Baru' : 'Selesai'}
+                              {isNew ? 'Baru' : (records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length > 1 ? `${records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length} Rekod` : 'Selesai')}
                             </span>
                           </div>
                         );
@@ -1477,6 +1495,67 @@ export const Dashboard: React.FC<Props> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedLecturerHistory && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-xl font-black text-slate-800">{selectedLecturerHistory.name}</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Sejarah Pemantauan ({selectedLecturerHistory.records.length} Rekod)</p>
+              </div>
+              <button onClick={() => setSelectedLecturerHistory(null)} className="p-2 hover:bg-white rounded-full transition-colors">
+                <XMarkIcon className="h-6 w-6 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+              {selectedLecturerHistory.records.map((record, idx) => {
+                const allScores = Object.values(record.scores);
+                const avg = allScores.length > 0 ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(2) : '0.00';
+                return (
+                  <div key={record.id} className="p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-indigo-200 transition-all">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-slate-800">Sesi #{selectedLecturerHistory.records.length - idx}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{formatDate(record.date)}</span>
+                      </div>
+                      <p className="text-xs text-slate-600 font-bold">{record.code} - {record.course}</p>
+                      <p className="text-[10px] text-slate-400">Pemantau: {record.evaluatorName}</p>
+                    </div>
+                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                      <div className="text-right">
+                        <p className="text-lg font-black text-indigo-600">{avg}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Purata Skor</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => generatePDF(record, 'view')} 
+                          className="p-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
+                          title="Lihat PDF"
+                        >
+                          <EyeIcon className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => generatePDF(record, 'save')} 
+                          className="p-2 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
+                          title="Muat Turun PDF"
+                        >
+                          <ArrowDownTrayIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button onClick={() => setSelectedLecturerHistory(null)} className="px-6 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all">
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
