@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "npx tsc && vite build",
+    "start": "tsx server.ts",
     "lint": "npx tsc --noEmit",
     "preview": "vite preview"
   },
