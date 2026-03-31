@@ -109,6 +109,7 @@ export const Dashboard: React.FC<Props> = ({
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [showLecturerModal, setShowLecturerModal] = useState(false);
+  const [isOtherDept, setIsOtherDept] = useState(false);
   const [editingLecturer, setEditingLecturer] = useState<{ name: string; department: string } | null>(null);
   const [lecturerFormData, setLecturerFormData] = useState({ name: '', department: '' });
   const [activeLecturer, setActiveLecturer] = useState('');
@@ -238,8 +239,8 @@ export const Dashboard: React.FC<Props> = ({
   }, [schedules]);
 
   const activeDepartments = useMemo(() => {
-    const depts = new Set(allLecturers.map(l => l.department));
-    return DEPARTMENTS.filter(d => depts.has(d));
+    const depts = Array.from(new Set(allLecturers.map(l => l.department)));
+    return depts.sort();
   }, [allLecturers]);
 
   const departmentMonitoringStats = useMemo(() => {
@@ -247,6 +248,10 @@ export const Dashboard: React.FC<Props> = ({
       const lecturersInDept = allLecturers.filter(l => l.department === dept);
       const totalInDept = lecturersInDept.length;
       const monitoredLecturers = lecturersInDept.filter(l => records.some(r => 
+        r.lecturerName.toLowerCase() === l.name.toLowerCase() && 
+        r.department === l.department
+      ));
+      const unmonitoredLecturers = lecturersInDept.filter(l => !records.some(r => 
         r.lecturerName.toLowerCase() === l.name.toLowerCase() && 
         r.department === l.department
       ));
@@ -264,7 +269,8 @@ export const Dashboard: React.FC<Props> = ({
         total: totalInDept,
         monitored: monitoredCount,
         percentage,
-        kjMonitored
+        kjMonitored,
+        unmonitoredNames: unmonitoredLecturers.map(l => l.name)
       };
     }).sort((a, b) => b.percentage - a.percentage);
   }, [records, allLecturers, activeDepartments]);
@@ -424,12 +430,14 @@ export const Dashboard: React.FC<Props> = ({
   const handleNewLecturer = () => {
     setEditingLecturer(null);
     setLecturerFormData({ name: '', department: '' });
+    setIsOtherDept(false);
     setShowLecturerModal(true);
   };
 
   const handleEditLecturer = (lec: { name: string; department: string }) => {
     setEditingLecturer(lec);
     setLecturerFormData({ name: lec.name, department: lec.department });
+    setIsOtherDept(!DEPARTMENTS.includes(lec.department));
     setShowLecturerModal(true);
   };
 
@@ -599,7 +607,12 @@ export const Dashboard: React.FC<Props> = ({
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
               <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl"><UsersIcon className="h-6 w-6"/></div>
-              <div><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Pensyarah</p><p className="text-xl font-black text-slate-900">{allLecturers.length}</p></div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status Pemantauan</p>
+                <p className="text-xl font-black text-slate-900">
+                  {allLecturers.filter(l => records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase() && r.department === l.department)).length}/{allLecturers.length}
+                </p>
+              </div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><BuildingOfficeIcon className="h-6 w-6"/></div>
@@ -921,6 +934,27 @@ export const Dashboard: React.FC<Props> = ({
                     {dept.kjMonitored && <div className="absolute top-2 right-2 text-rose-600"><CheckBadgeIcon className="h-5 w-5" /></div>}
                     <div className="flex justify-between items-center"><h4 className="text-sm font-black text-slate-800">{dept.name}</h4><span className="text-xs font-black">{dept.monitored} / {dept.total}</span></div>
                     <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{ width: `${dept.percentage}%` }} /></div>
+                    
+                    {dept.unmonitoredNames.length > 0 && (
+                      <div className="mt-3 p-3 bg-rose-50/50 rounded-xl border border-rose-100/50">
+                        <p className="text-[10px] font-black text-rose-600 uppercase mb-2 flex items-center gap-1">
+                          <ExclamationCircleIcon className="h-3 w-3" /> Belum Dipantau ({dept.unmonitoredNames.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {dept.unmonitoredNames.slice(0, 3).map(name => (
+                            <span key={name} className="px-2 py-0.5 bg-white border border-rose-100 text-[10px] font-bold text-slate-600 rounded-lg">
+                              {name}
+                            </span>
+                          ))}
+                          {dept.unmonitoredNames.length > 3 && (
+                            <span className="px-2 py-0.5 bg-white border border-rose-100 text-[10px] font-bold text-slate-400 rounded-lg">
+                              +{dept.unmonitoredNames.length - 3} lagi
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
                       <span>{dept.monitored} Dipantau</span>
                       <button 
@@ -1230,15 +1264,47 @@ export const Dashboard: React.FC<Props> = ({
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Jabatan / Unit</label>
-                  <select 
-                    required
-                    value={lecturerFormData.department}
-                    onChange={e => setLecturerFormData({...lecturerFormData, department: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all appearance-none"
-                  >
-                    <option value="" disabled>Pilih Jabatan</option>
-                    {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
-                  </select>
+                  {!isOtherDept ? (
+                    <select 
+                      required
+                      value={lecturerFormData.department}
+                      onChange={e => {
+                        if (e.target.value === 'OTHER') {
+                          setIsOtherDept(true);
+                          setLecturerFormData({...lecturerFormData, department: ''});
+                        } else {
+                          setLecturerFormData({...lecturerFormData, department: e.target.value});
+                        }
+                      }}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all appearance-none"
+                    >
+                      <option value="" disabled>Pilih Jabatan</option>
+                      {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+                      <option value="OTHER">LAIN-LAIN (Sila Nyatakan)</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input 
+                        required
+                        type="text" 
+                        value={lecturerFormData.department}
+                        onChange={e => setLecturerFormData({...lecturerFormData, department: e.target.value})}
+                        className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all"
+                        placeholder="Masukkan Nama Jabatan"
+                        autoFocus
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setIsOtherDept(false);
+                          setLecturerFormData({...lecturerFormData, department: ''});
+                        }}
+                        className="px-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-600"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex gap-3 pt-4">

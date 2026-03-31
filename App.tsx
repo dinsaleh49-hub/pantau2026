@@ -414,8 +414,8 @@ const App: React.FC = () => {
       return;
     }
     setLecturersList(prev => {
-      if (prev.some(l => l.name.toLowerCase() === lecturer.name.toLowerCase())) {
-        alert('Nama pensyarah sudah wujud dalam senarai.');
+      if (prev.some(l => l.name.toLowerCase() === lecturer.name.toLowerCase() && l.department === lecturer.department)) {
+        alert('Nama pensyarah dan jabatan ini sudah wujud dalam senarai.');
         return prev;
       }
       return [...prev, lecturer];
