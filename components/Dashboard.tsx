@@ -35,7 +35,7 @@ import {
 import { generatePDF, generateSummaryPDF, generateFullDepartmentPDF } from '../services/pdfService';
 import { uploadToGoogleDrive } from '../services/googleDriveService';
 import { GoogleGenAI } from "@google/genai";
-import { EVALUATION_CRITERIA, DEPARTMENTS } from '../constants';
+import { EVALUATION_CRITERIA, DEPARTMENTS, LECTURERS } from '../constants';
 import { UserGuideModal } from './UserGuideModal';
 
 interface Props {
@@ -114,6 +114,8 @@ export const Dashboard: React.FC<Props> = ({
   const [lecturerFormData, setLecturerFormData] = useState({ name: '', department: '' });
   const [activeLecturer, setActiveLecturer] = useState('');
   
+  const [selectedDeptDetails, setSelectedDeptDetails] = useState<string | null>(null);
+  
   const [isSavingToDrive, setIsSavingToDrive] = useState<string | null>(null);
   const [isBulkSaving, setIsBulkSaving] = useState<string | null>(null);
 
@@ -134,6 +136,10 @@ export const Dashboard: React.FC<Props> = ({
       (recordsDeptFilter === 'all' || r.department === recordsDeptFilter)
     );
   }, [records, searchTerm, onlyKJRecords, recordsDeptFilter]);
+
+  const newLecturers = useMemo(() => {
+    return allLecturers.filter(l => !LECTURERS.some(staticL => staticL.name.toLowerCase() === l.name.toLowerCase()));
+  }, [allLecturers]);
 
   const monitoringStatus = useMemo(() => {
     return lecturers
@@ -169,6 +175,13 @@ export const Dashboard: React.FC<Props> = ({
       })
       .filter(item => item.name.toLowerCase().includes(statusSearchTerm.toLowerCase()));
   }, [records, lecturers, statusSearchTerm, selectedDeptFilter, onlyKJ]);
+
+  const unmonitoredLecturersOverall = useMemo(() => {
+    return allLecturers.filter(l => !records.some(r => 
+      r.lecturerName.toLowerCase() === l.name.toLowerCase() && 
+      r.department === l.department
+    ));
+  }, [allLecturers, records]);
 
   const kjMonitoringStats = useMemo(() => {
     const allKJs = allLecturers.filter(l => l.name.includes('(KJ)'));
@@ -605,14 +618,26 @@ export const Dashboard: React.FC<Props> = ({
               <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl"><CheckBadgeIcon className="h-6 w-6"/></div>
               <div><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Pemantauan KJ</p><p className="text-xl font-black text-slate-900">{kjMonitoringStats.monitored}/{kjMonitoringStats.total}</p></div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 relative group">
               <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl"><UsersIcon className="h-6 w-6"/></div>
               <div>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status Pemantauan</p>
                 <p className="text-xl font-black text-slate-900">
-                  {allLecturers.filter(l => records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase() && r.department === l.department)).length}/{allLecturers.length}
+                  {allLecturers.length - unmonitoredLecturersOverall.length}/{allLecturers.length}
                 </p>
               </div>
+              {unmonitoredLecturersOverall.length > 0 && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+                  <p className="text-[10px] font-black text-rose-600 uppercase mb-2">Belum Dipantau ({unmonitoredLecturersOverall.length})</p>
+                  <div className="space-y-1 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                    {unmonitoredLecturersOverall.map(l => (
+                      <div key={l.name} className="text-[10px] font-bold text-slate-600 border-b border-slate-50 pb-1">
+                        {l.name} <span className="text-[8px] text-slate-400 font-medium">({l.department})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><BuildingOfficeIcon className="h-6 w-6"/></div>
@@ -773,6 +798,26 @@ export const Dashboard: React.FC<Props> = ({
 
       {mainTab === 'status' && !isRestricted && (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+          {newLecturers.length > 0 && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white rounded-2xl shadow-sm text-indigo-600">
+                  <SparklesIcon className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-indigo-900 uppercase tracking-tight">Pensyarah Baru Ditambah</h4>
+                  <p className="text-[10px] text-indigo-600 font-bold">Terdapat {newLecturers.length} pensyarah baru yang telah dimasukkan ke dalam sistem.</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1 justify-center md:justify-end max-w-md">
+                {newLecturers.map(l => (
+                  <span key={l.name} className="px-2 py-1 bg-white border border-indigo-100 text-[9px] font-black text-indigo-700 rounded-lg shadow-sm">
+                    {l.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
               <div>
@@ -818,6 +863,11 @@ export const Dashboard: React.FC<Props> = ({
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-slate-800">{item.name}</p>
                           {item.isKJ && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
+                          {!LECTURERS.some(l => l.name.toLowerCase() === item.name.toLowerCase()) && (
+                            <span className="bg-indigo-50 text-indigo-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-indigo-100 flex items-center gap-0.5">
+                              <SparklesIcon className="h-2 w-2" /> Baru
+                            </span>
+                          )}
                         </div>
                         <p className="text-[10px] text-slate-400 font-medium">{item.department}</p>
                       </td>
@@ -932,7 +982,18 @@ export const Dashboard: React.FC<Props> = ({
                 {departmentMonitoringStats.map((dept, idx) => (
                   <div key={idx} className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-3 relative overflow-hidden">
                     {dept.kjMonitored && <div className="absolute top-2 right-2 text-rose-600"><CheckBadgeIcon className="h-5 w-5" /></div>}
-                    <div className="flex justify-between items-center"><h4 className="text-sm font-black text-slate-800">{dept.name}</h4><span className="text-xs font-black">{dept.monitored} / {dept.total}</span></div>
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-black text-slate-800">{dept.name}</h4>
+                      <button 
+                        onClick={() => setSelectedDeptDetails(dept.name)}
+                        className="text-[10px] font-black text-indigo-600 hover:underline"
+                      >
+                        Lihat Semua ({dept.total})
+                      </button>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
+                      <span>{dept.monitored} / {dept.total} Dipantau</span>
+                    </div>
                     <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{ width: `${dept.percentage}%` }} /></div>
                     
                     {dept.unmonitoredNames.length > 0 && (
@@ -940,17 +1001,12 @@ export const Dashboard: React.FC<Props> = ({
                         <p className="text-[10px] font-black text-rose-600 uppercase mb-2 flex items-center gap-1">
                           <ExclamationCircleIcon className="h-3 w-3" /> Belum Dipantau ({dept.unmonitoredNames.length})
                         </p>
-                        <div className="flex flex-wrap gap-1">
-                          {dept.unmonitoredNames.slice(0, 3).map(name => (
+                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
+                          {dept.unmonitoredNames.map(name => (
                             <span key={name} className="px-2 py-0.5 bg-white border border-rose-100 text-[10px] font-bold text-slate-600 rounded-lg">
                               {name}
                             </span>
                           ))}
-                          {dept.unmonitoredNames.length > 3 && (
-                            <span className="px-2 py-0.5 bg-white border border-rose-100 text-[10px] font-bold text-slate-400 rounded-lg">
-                              +{dept.unmonitoredNames.length - 3} lagi
-                            </span>
-                          )}
                         </div>
                       </div>
                     )}
@@ -1180,6 +1236,68 @@ export const Dashboard: React.FC<Props> = ({
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Department Details Modal */}
+      {selectedDeptDetails && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-xl font-black text-slate-800">{selectedDeptDetails}</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Senarai Keseluruhan Pensyarah</p>
+              </div>
+              <button onClick={() => setSelectedDeptDetails(null)} className="p-2 hover:bg-white rounded-full transition-colors">
+                <XMarkIcon className="h-6 w-6 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                    <CheckBadgeIcon className="h-3 w-3" /> Sudah Dipantau ({departmentMonitoringStats.find(d => d.name === selectedDeptDetails)?.monitored})
+                  </p>
+                  <div className="space-y-1.5">
+                    {allLecturers
+                      .filter(l => l.department === selectedDeptDetails && records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()))
+                      .map(l => (
+                        <div key={l.name} className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-900">{l.name}</span>
+                          <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">Selesai</span>
+                        </div>
+                      ))}
+                    {allLecturers.filter(l => l.department === selectedDeptDetails && records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase())).length === 0 && (
+                      <p className="text-xs text-slate-400 italic">Tiada rekod.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-1">
+                    <ClockIcon className="h-3 w-3" /> Belum Dipantau ({departmentMonitoringStats.find(d => d.name === selectedDeptDetails)?.unmonitoredNames.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {allLecturers
+                      .filter(l => l.department === selectedDeptDetails && !records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()))
+                      .map(l => (
+                        <div key={l.name} className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl flex items-center justify-between">
+                          <span className="text-xs font-bold text-rose-900">{l.name}</span>
+                          <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">Belum</span>
+                        </div>
+                      ))}
+                    {allLecturers.filter(l => l.department === selectedDeptDetails && !records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase())).length === 0 && (
+                      <p className="text-xs text-emerald-600 font-bold">Semua telah dipantau! ✨</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button onClick={() => setSelectedDeptDetails(null)} className="px-6 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all">
+                Tutup
+              </button>
             </div>
           </div>
         </div>
