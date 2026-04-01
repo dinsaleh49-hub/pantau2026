@@ -19,7 +19,7 @@ export const DEPARTMENTS = [
   'Jabatan Pendidikan Teknik dan Vokasional',
   'Jabatan Pengajian Melayu',
   'Jabatan Pendidikan Jasmani dan Kokurikulum',
-  
+  'Jabatan Pendidikan Jasmani dan Kesihatan',
 ];
 
 // Added department property to each lecturer to resolve type mismatch errors in App.tsx (Lines 167 and 180)
@@ -114,7 +114,7 @@ export const LECTURERS = [
 { name: 'Muhammad Hilal bin Arshad',	department:	'Jabatan Ilmu Pendidikan' },
 { name: 'Noor Aqilah binti Abdul Latiff Janaton',	department:	'Jabatan Pendidikan Teknik dan Vokasional' },
 { name: 'Noor Aziah binti Mohd Noor',	department:	'Jabatan Pendidikan Islam' },
-{ name: 'Noor Marlina binti Mohamed Nor',	department:	'Jabatan Pendidikan Jasmani dan Kesihatan' },
+{ name: 'Noor Marlina binti Mohamed Nor',	department:	'Jabatan Pendidikan Jasmani dan Kokurikulum' },
 { name: 'Noraziah binti Mhd Yusop',	department:	'Jabatan Pendidikan Islam' },
 { name: 'Norimah binti Mohd Salleh',	department:	'Jabatan Pendidikan Teknik dan Vokasional' },
 { name: 'Norliha binti Jemain',	department:	'Jabatan Matematik' },

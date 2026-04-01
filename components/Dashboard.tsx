@@ -112,7 +112,7 @@ export const Dashboard: React.FC<Props> = ({
   const [showLecturerModal, setShowLecturerModal] = useState(false);
   const [isOtherDept, setIsOtherDept] = useState(false);
   const [editingLecturer, setEditingLecturer] = useState<{ name: string; department: string } | null>(null);
-  const [lecturerFormData, setLecturerFormData] = useState({ name: '', department: '' });
+  const [lecturerFormData, setLecturerFormData] = useState({ name: '', department: '', isKJ: false });
   const [activeLecturer, setActiveLecturer] = useState('');
   
   const [selectedDeptDetails, setSelectedDeptDetails] = useState<string | null>(null);
@@ -450,24 +450,35 @@ export const Dashboard: React.FC<Props> = ({
 
   const handleNewLecturer = () => {
     setEditingLecturer(null);
-    setLecturerFormData({ name: '', department: '' });
+    setLecturerFormData({ name: '', department: '', isKJ: false });
     setIsOtherDept(false);
     setShowLecturerModal(true);
   };
 
   const handleEditLecturer = (lec: { name: string; department: string }) => {
     setEditingLecturer(lec);
-    setLecturerFormData({ name: lec.name, department: lec.department });
+    const isKJ = lec.name.includes('(KJ)');
+    const cleanName = lec.name.replace(' (KJ)', '').replace('(KJ)', '').trim();
+    setLecturerFormData({ name: cleanName, department: lec.department, isKJ });
     setIsOtherDept(!DEPARTMENTS.includes(lec.department));
     setShowLecturerModal(true);
   };
 
   const handleLecturerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const finalName = lecturerFormData.isKJ 
+      ? `${lecturerFormData.name.trim()} (KJ)` 
+      : lecturerFormData.name.trim();
+    
+    const submissionData = {
+      name: finalName,
+      department: lecturerFormData.department
+    };
+
     if (editingLecturer) {
-      onUpdateLecturer(editingLecturer.name, editingLecturer.department, lecturerFormData);
+      onUpdateLecturer(editingLecturer.name, editingLecturer.department, submissionData);
     } else {
-      onAddLecturer(lecturerFormData);
+      onAddLecturer(submissionData);
     }
     setShowLecturerModal(false);
   };
@@ -1477,6 +1488,22 @@ export const Dashboard: React.FC<Props> = ({
                       </button>
                     </div>
                   )}
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input 
+                      type="checkbox" 
+                      checked={lecturerFormData.isKJ}
+                      onChange={e => setLecturerFormData({...lecturerFormData, isKJ: e.target.checked})}
+                      className="w-5 h-5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 transition-all cursor-pointer"
+                    />
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-rose-600 transition-colors">
+                      Ketua Jabatan (KJ)
+                    </span>
+                  </label>
+                  <p className="mt-1 text-xs text-slate-400 ml-7">
+                    Tandakan jika pensyarah ini adalah Ketua Jabatan.
+                  </p>
                 </div>
               </div>
               <div className="flex gap-3 pt-4">
