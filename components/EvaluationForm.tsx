@@ -41,6 +41,7 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
   const [itemRemarks, setItemRemarks] = useState<Record<string, string>>({});
   const [lecturerSig, setLecturerSig] = useState<string>('');
   const [evaluatorSig, setEvaluatorSig] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -169,7 +170,13 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
       evaluatorSignature: evaluatorSig
     };
     
-    onSubmit(record);
+    setIsSubmitting(true);
+    
+    // Simulate a small delay for better UX feedback
+    setTimeout(() => {
+      onSubmit(record);
+      setIsSubmitting(false);
+    }, 800);
   };
 
   const handleViewPDF = () => {
@@ -457,8 +464,19 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
         >
           Lihat PDF
         </button>
-        <button type="submit" className="bg-indigo-600 text-white px-10 py-4 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
-          {initialData ? 'Kemaskini' : 'Simpan'}
+        <button 
+          type="submit" 
+          disabled={isSubmitting}
+          className={`bg-indigo-600 text-white px-10 py-4 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+        >
+          {isSubmitting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Menyimpan...
+            </>
+          ) : (
+            initialData ? 'Kemaskini' : 'Simpan'
+          )}
         </button>
       </div>
     </form>

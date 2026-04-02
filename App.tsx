@@ -87,6 +87,12 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('ipgkpt_lecturers');
     return saved ? JSON.parse(saved) : LECTURERS;
   });
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   const fetchData = useCallback(async (isSilent = false) => {
     if (isLocalUpdate && isSilent) return; // Don't poll if we have unsynced local changes
@@ -380,6 +386,7 @@ const App: React.FC = () => {
 
     setEditingRecord(null);
     setView('dashboard');
+    showNotification('Rekod penilaian telah berjaya disimpan ke dalam sistem.');
   };
 
   const handleAddSchedule = (schedule: MonitoringSchedule) => {
@@ -468,6 +475,7 @@ const App: React.FC = () => {
       setSchedules((prev: MonitoringSchedule[]) => prev.filter((s: MonitoringSchedule) => s.id !== confirmModal.targetId));
     }
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
+    showNotification('Rekod telah berjaya dipadamkan.');
   };
 
   // Restricted user identification
@@ -602,6 +610,24 @@ const App: React.FC = () => {
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}
       />
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className={`px-6 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 ${
+            notification.type === 'success' 
+              ? 'bg-emerald-600 border-emerald-500 text-white' 
+              : 'bg-rose-600 border-rose-500 text-white'
+          }`}>
+            {notification.type === 'success' ? (
+              <CheckBadgeIcon className="h-5 w-5" />
+            ) : (
+              <ExclamationCircleIcon className="h-5 w-5" />
+            )}
+            <p className="text-sm font-bold">{notification.message}</p>
+          </div>
+        </div>
+      )}
 
       <footer className="bg-white border-t border-slate-200 py-6 mt-12 no-print">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
