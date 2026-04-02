@@ -30,8 +30,7 @@ import {
   ArchiveBoxArrowDownIcon,
   HandThumbUpIcon,
   ExclamationCircleIcon,
-  UserPlusIcon,
-  ClipboardDocumentCheckIcon
+  UserPlusIcon
 } from '@heroicons/react/24/outline';
 import { generatePDF, generateSummaryPDF, generateFullDepartmentPDF } from '../services/pdfService';
 import { uploadToGoogleDrive } from '../services/googleDriveService';
@@ -54,7 +53,6 @@ interface Props {
   onUpdateSchedule: (schedule: MonitoringSchedule) => void;
   onAddLecturer: (lecturer: { name: string; department: string }) => void;
   onUpdateLecturer: (oldName: string, oldDept: string, updatedLecturer: { name: string; department: string }) => void;
-  onOpenForm: (initialData?: any) => void;
   onRefresh?: () => void;
   lastSync?: Date | null;
 }
@@ -84,7 +82,6 @@ export const Dashboard: React.FC<Props> = ({
   onUpdateSchedule,
   onAddLecturer,
   onUpdateLecturer,
-  onOpenForm,
   onRefresh,
   lastSync
 }) => {
@@ -871,14 +868,6 @@ export const Dashboard: React.FC<Props> = ({
                     </select>
                   </div>
                 )}
-                {selectedDeptFilter !== 'all' && (
-                  <button 
-                    onClick={() => onOpenForm({ department: selectedDeptFilter })}
-                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase shadow-md hover:bg-indigo-700 transition-all"
-                  >
-                    <ClipboardDocumentCheckIcon className="h-4 w-4" /> Borang {selectedDeptFilter}
-                  </button>
-                )}
                 <div className="relative">
                   <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input type="text" placeholder="Cari nama..." value={statusSearchTerm} onChange={e => setStatusSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
@@ -964,13 +953,6 @@ export const Dashboard: React.FC<Props> = ({
                            </>
                          )}
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
-                         <button 
-                           onClick={() => onOpenForm({ lecturerName: item.name, department: item.department })} 
-                           className="p-1.5 text-emerald-600" 
-                           title="Isi Borang Penilaian"
-                         >
-                           <ClipboardDocumentCheckIcon className="h-4 w-4" />
-                         </button>
                          {isAdminView && (
                            <>
                              <button onClick={() => handleEditLecturer({ name: item.name, department: item.department })} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Pensyarah"><PencilSquareIcon className="h-4 w-4" /></button>
@@ -1007,11 +989,13 @@ export const Dashboard: React.FC<Props> = ({
                             <CheckBadgeIcon className="h-3.5 w-3.5 text-emerald-500" />
                             <span className="text-[11px] font-bold text-emerald-800">{kj.name}</span>
                           </div>
-                          {records.filter(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()).length > 1 && (
-                            <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">
-                              {records.filter(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()).length} Rekod
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {records.filter(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()).length > 1 && (
+                              <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">
+                                {records.filter(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()).length} Rekod
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                       {allLecturers.filter(l => l.name.includes('(KJ)') && records.some(r => r.lecturerName === l.name)).length === 0 && (
@@ -1023,9 +1007,11 @@ export const Dashboard: React.FC<Props> = ({
                     <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3">KJ Belum Dipantau</p>
                     <div className="space-y-1.5 overflow-y-auto max-h-[200px] pr-2 custom-scrollbar">
                       {kjMonitoringStats.unmonitored.map(kj => (
-                        <div key={kj.name} className="flex items-center gap-2 px-3 py-2 bg-white border border-rose-100 rounded-xl">
-                          <ClockIcon className="h-3.5 w-3.5 text-rose-400" />
-                          <span className="text-[11px] font-bold text-rose-800">{kj.name}</span>
+                        <div key={kj.name} className="flex items-center justify-between px-3 py-2 bg-white border border-rose-100 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <ClockIcon className="h-3.5 w-3.5 text-rose-400" />
+                            <span className="text-[11px] font-bold text-rose-800">{kj.name}</span>
+                          </div>
                         </div>
                       ))}
                       {kjMonitoringStats.unmonitored.length === 0 && (
@@ -1045,13 +1031,6 @@ export const Dashboard: React.FC<Props> = ({
                     <div className="flex justify-between items-center">
                       <h4 className="text-sm font-black text-slate-800">{dept.name}</h4>
                       <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => onOpenForm({ department: dept.name })}
-                          className="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-700 transition-all shadow-sm"
-                          title="Isi Borang Penilaian Baru untuk Jabatan Ini"
-                        >
-                          <ClipboardDocumentCheckIcon className="h-3 w-3" /> Borang
-                        </button>
                         <button 
                           onClick={() => setSelectedDeptDetails(dept.name)}
                           className="text-[10px] font-black text-indigo-600 hover:underline"
@@ -1233,14 +1212,6 @@ export const Dashboard: React.FC<Props> = ({
                 </div>
               </div>
             )}
-            {analysisDeptFilter !== 'all' && (
-              <button 
-                onClick={() => onOpenForm({ department: analysisDeptFilter })}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-              >
-                <ClipboardDocumentCheckIcon className="h-5 w-5" /> Isi Borang {analysisDeptFilter}
-              </button>
-            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1367,13 +1338,6 @@ export const Dashboard: React.FC<Props> = ({
                               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${isNew ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                 {isNew ? 'Baru' : (records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length > 1 ? `${records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length} Rekod` : 'Selesai')}
                               </span>
-                              <button 
-                                onClick={() => onOpenForm({ lecturerName: l.name, department: l.department })}
-                                className="p-1 bg-white border border-slate-200 rounded text-indigo-600 hover:bg-indigo-50 transition-colors"
-                                title="Isi Borang"
-                              >
-                                <ClipboardDocumentCheckIcon className="h-3 w-3" />
-                              </button>
                             </div>
                           </div>
                         );
@@ -1395,13 +1359,6 @@ export const Dashboard: React.FC<Props> = ({
                           <span className="text-xs font-bold text-rose-900">{l.name}</span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">Belum</span>
-                            <button 
-                              onClick={() => onOpenForm({ lecturerName: l.name, department: l.department })}
-                              className="p-1 bg-white border border-slate-200 rounded text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="Isi Borang"
-                            >
-                              <ClipboardDocumentCheckIcon className="h-3 w-3" />
-                            </button>
                           </div>
                         </div>
                       ))}

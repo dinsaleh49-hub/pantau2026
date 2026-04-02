@@ -528,17 +528,14 @@ const App: React.FC = () => {
                   Dashboard
                 </button>
                 
-                {/* Only admins can access the Evaluation Form */}
-                {user.role === 'admin' && (
-                  <button
-                    onClick={() => { setEditingRecord(null); setView('form'); }}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                      view === 'form' && !editingRecord ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
-                    }`}
-                  >
-                    + Borang
-                  </button>
-                )}
+                <button
+                  onClick={() => { setEditingRecord(null); setView('form'); }}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                    view === 'form' && !editingRecord ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  + Borang
+                </button>
 
                 <button
                   onClick={handleLogout}
@@ -570,18 +567,10 @@ const App: React.FC = () => {
             onUpdateSchedule={handleUpdateSchedule}
             onAddLecturer={handleAddLecturer}
             onUpdateLecturer={handleUpdateLecturer}
-            onOpenForm={(data) => { 
-              if (data) {
-                setEditingRecord(data as EvaluationRecord);
-              } else {
-                setEditingRecord(null);
-              }
-              setView('form'); 
-            }}
             onRefresh={() => fetchData()}
             lastSync={lastSync}
           />
-        ) : user.role === 'admin' ? (
+        ) : (
           <div className="max-w-4xl mx-auto">
             <button 
               onClick={() => { setView('dashboard'); setEditingRecord(null); }}
@@ -597,12 +586,6 @@ const App: React.FC = () => {
               isAdmin={user.role === 'admin' || user.department === 'SEMUA'}
               initialData={editingRecord || undefined} 
             />
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-             <ExclamationTriangleIcon className="h-12 w-12 mb-4" />
-             <p className="font-bold">Akses Dilarang</p>
-             <p className="text-xs mt-2">Hanya Admin dibenarkan menyimpan laporan pemantauan.</p>
           </div>
         )}
       </main>
