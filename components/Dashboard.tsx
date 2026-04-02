@@ -87,6 +87,7 @@ export const Dashboard: React.FC<Props> = ({
 }) => {
   const isRestricted = username?.toLowerCase() === 'pensyarah' && userRole === 'user';
   const isAdminView = userRole === 'admin';
+  const canEdit = userRole === 'admin' || !isRestricted;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusSearchTerm, setStatusSearchTerm] = useState('');
@@ -798,17 +799,19 @@ export const Dashboard: React.FC<Props> = ({
                             <button onClick={() => generatePDF(record, 'view')} className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs font-bold hover:bg-slate-50 transition-colors"><PrinterIcon className="h-3.5 w-3.5" /> Cetak</button>
                             <button onClick={() => generateAISummary(record)} className="flex items-center gap-1 px-2 py-1 bg-amber-500 text-white rounded text-xs font-bold hover:bg-amber-600 transition-colors"><SparklesIcon className="h-3.5 w-3.5" /> Rumusan</button>
                             <button onClick={() => generatePDF(record, 'save')} className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-100 transition-colors"><ArrowDownTrayIcon className="h-3.5 w-3.5" /> Muat Turun</button>
-                            {isAdminView && (
+                            {(isAdminView || canEdit) && (
                               <>
-                                <button onClick={() => onEditRecord(record)} className="p-1.5 text-slate-400 hover:text-emerald-600"><PencilSquareIcon className="h-4 w-4" /></button>
-                                <button 
-                                  onClick={() => handleSaveToDrive(record)} 
-                                  className={`p-1.5 transition-colors ${isSavingToDrive === record.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
-                                  title="Simpan ke Folder Google Drive Admin"
-                                >
-                                  <CloudArrowUpIcon className="h-4 w-4" />
-                                </button>
-                                <button onClick={() => onDeleteRecord(record.id)} className="p-1.5 text-slate-400 hover:text-rose-600"><TrashIcon className="h-4 w-4" /></button>
+                                <button onClick={() => onEditRecord(record)} className="p-1.5 text-slate-400 hover:text-emerald-600" title="Kemaskini Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
+                                {isAdminView && (
+                                  <button 
+                                    onClick={() => handleSaveToDrive(record)} 
+                                    className={`p-1.5 transition-colors ${isSavingToDrive === record.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
+                                    title="Simpan ke Folder Google Drive Admin"
+                                  >
+                                    <CloudArrowUpIcon className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {isAdminView && <button onClick={() => onDeleteRecord(record.id)} className="p-1.5 text-slate-400 hover:text-rose-600" title="Padam Rekod"><TrashIcon className="h-4 w-4" /></button>}
                               </>
                             )}
                           </td>
@@ -932,16 +935,18 @@ export const Dashboard: React.FC<Props> = ({
                                  <ClockIcon className="h-3 w-3" /> Sejarah ({item.count})
                                </button>
                              )}
-                             {isAdminView && (
+                             {(isAdminView || canEdit) && (
                                <>
                                  <button onClick={() => onEditRecord(item.latestRecord!)} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
-                                 <button 
-                                  onClick={() => handleSaveToDrive(item.latestRecord!)} 
-                                  className={`p-1.5 transition-colors ${isSavingToDrive === item.latestRecord!.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
-                                  title="Simpan ke Folder Google Drive Admin"
-                                 >
-                                    <CloudArrowUpIcon className="h-4 w-4" />
-                                 </button>
+                                 {isAdminView && (
+                                   <button 
+                                    onClick={() => handleSaveToDrive(item.latestRecord!)} 
+                                    className={`p-1.5 transition-colors ${isSavingToDrive === item.latestRecord!.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
+                                    title="Simpan ke Folder Google Drive Admin"
+                                   >
+                                      <CloudArrowUpIcon className="h-4 w-4" />
+                                   </button>
+                                 )}
                                </>
                              )}
                              <button 
@@ -1138,14 +1143,16 @@ export const Dashboard: React.FC<Props> = ({
                     </div>
                     
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {isAdminView && (
+                      {(isAdminView || canEdit) && (
                         <>
-                          <button onClick={() => handleEditSchedule(s)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm">
+                          <button onClick={() => handleEditSchedule(s)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm" title="Kemaskini Jadual">
                             <PencilSquareIcon className="h-4 w-4" />
                           </button>
-                          <button onClick={() => onDeleteSchedule(s.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm">
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
+                          {isAdminView && (
+                            <button onClick={() => onDeleteSchedule(s.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm" title="Padam Jadual">
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          )}
                         </>
                       )}
                     </div>

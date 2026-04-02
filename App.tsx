@@ -401,10 +401,12 @@ const App: React.FC = () => {
 
   const handleAddSchedule = (schedule: MonitoringSchedule) => {
     setSchedules((prev: MonitoringSchedule[]) => [schedule, ...prev]);
+    showNotification('Jadual pemantauan telah berjaya didaftarkan.');
   };
 
   const handleUpdateSchedule = (updatedSchedule: MonitoringSchedule) => {
     setSchedules((prev: MonitoringSchedule[]) => prev.map((s: MonitoringSchedule) => s.id === updatedSchedule.id ? updatedSchedule : s));
+    showNotification('Jadual pemantauan telah berjaya dikemaskini.');
   };
 
   const handleEditRecord = (record: EvaluationRecord) => {
@@ -423,6 +425,7 @@ const App: React.FC = () => {
       setRecords(prev => prev.map(r => (r.lecturerName === oldName && r.department === oldDept) ? { ...r, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : r));
       setSchedules(prev => prev.map(s => (s.lecturerName === oldName && s.department === oldDept) ? { ...s, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : s));
     }
+    showNotification('Maklumat pensyarah telah berjaya dikemaskini.');
   };
 
   const handleAddLecturer = (lecturer: Lecturer) => {
@@ -437,6 +440,7 @@ const App: React.FC = () => {
       }
       return [...prev, lecturer];
     });
+    showNotification('Pensyarah baru telah berjaya ditambah.');
   };
 
   const openDeleteRecordConfirm = (id: string) => {
