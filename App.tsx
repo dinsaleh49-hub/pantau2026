@@ -75,10 +75,20 @@ const App: React.FC = () => {
   const [showGuideModal, setShowGuideModal] = useState(false);
   const isInitialLoad = useRef(true);
   
-  const [records, setRecords] = useState<EvaluationRecord[]>([]);
-  const [schedules, setSchedules] = useState<MonitoringSchedule[]>([]);
+  const [records, setRecords] = useState<EvaluationRecord[]>(() => {
+    const saved = localStorage.getItem('ipgkpt_records');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [schedules, setSchedules] = useState<MonitoringSchedule[]>(() => {
+    const saved = localStorage.getItem('ipgkpt_schedules');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isLocalUpdate, setIsLocalUpdate] = useState(false);
+  const [isLocalUpdate, setIsLocalUpdate] = useState({
+    records: false,
+    schedules: false,
+    lecturers: false
+  });
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [persistenceType, setPersistenceType] = useState<'supabase' | 'local_file' | 'unknown'>('unknown');
   const [supabaseStatus, setSupabaseStatus] = useState<string>('unknown');
@@ -95,7 +105,8 @@ const App: React.FC = () => {
   };
 
   const fetchData = useCallback(async (isSilent = false) => {
-    if (isLocalUpdate && isSilent) return; // Don't poll if we have unsynced local changes
+    const isAnyLocalUpdate = isLocalUpdate.records || isLocalUpdate.schedules || isLocalUpdate.lecturers;
+    if (isAnyLocalUpdate && isSilent) return; // Don't poll if we have unsynced local changes
     if (!isSilent) setIsSyncing(true);
     try {
       const [recordsRes, schedulesRes, lecturersRes, healthRes] = await Promise.all([
@@ -117,12 +128,13 @@ const App: React.FC = () => {
       if (recordsRes.ok) {
         const recordsData = await recordsRes.json();
         if (Array.isArray(recordsData)) {
-          if (recordsData.length > 0 || !isInitialLoad.current) {
+          // Only update if server has data OR if it's the very first load and server is empty
+          if (recordsData.length > 0) {
             setRecords(recordsData);
           } else if (isInitialLoad.current) {
             // Migration logic only on first load if server is empty
             const saved = localStorage.getItem('ipgkpt_records');
-            if (saved) {
+            if (saved && JSON.parse(saved).length > 0) {
               const localRecords = JSON.parse(saved);
               setRecords(localRecords);
               // Push to server immediately
@@ -133,7 +145,6 @@ const App: React.FC = () => {
               }).catch(console.error);
             } else {
               setRecords(INITIAL_RECORDS);
-              // Push initial records to server
               fetch('/api/records', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -147,11 +158,11 @@ const App: React.FC = () => {
       if (schedulesRes.ok) {
         const schedulesData = await schedulesRes.json();
         if (Array.isArray(schedulesData)) {
-          if (schedulesData.length > 0 || !isInitialLoad.current) {
+          if (schedulesData.length > 0) {
             setSchedules(schedulesData);
           } else if (isInitialLoad.current) {
             const saved = localStorage.getItem('ipgkpt_schedules');
-            if (saved) {
+            if (saved && JSON.parse(saved).length > 0) {
               const localSchedules = JSON.parse(saved);
               setSchedules(localSchedules);
               fetch('/api/schedules', {
@@ -167,11 +178,11 @@ const App: React.FC = () => {
       if (lecturersRes.ok) {
         const lecturersData = await lecturersRes.json();
         if (Array.isArray(lecturersData)) {
-          if (lecturersData.length > 0 || !isInitialLoad.current) {
+          if (lecturersData.length > 0) {
             setLecturersList(lecturersData);
           } else if (isInitialLoad.current) {
             const saved = localStorage.getItem('ipgkpt_lecturers');
-            if (saved) {
+            if (saved && JSON.parse(saved).length > 0) {
               const localLecturers = JSON.parse(saved);
               setLecturersList(localLecturers);
               fetch('/api/lecturers', {
@@ -211,7 +222,7 @@ const App: React.FC = () => {
     localStorage.setItem('ipgkpt_records', JSON.stringify(records));
     
     const syncRecords = async () => {
-      setIsLocalUpdate(true);
+      setIsLocalUpdate(prev => ({ ...prev, records: true }));
       try {
         const response = await fetch('/api/records', {
           method: 'POST',
@@ -223,11 +234,10 @@ const App: React.FC = () => {
           throw new Error(errData.error || `Server error: ${response.status}`);
         }
         setSyncError(null);
-        setIsLocalUpdate(false);
+        setIsLocalUpdate(prev => ({ ...prev, records: false }));
       } catch (e: any) {
         console.error("Failed to sync records:", e);
         setSyncError(`Gagal menyimpan rekod: ${e.message}`);
-        // We don't set isLocalUpdate to false here so we don't pull old data if sync failed
       }
     };
     
@@ -241,7 +251,7 @@ const App: React.FC = () => {
     localStorage.setItem('ipgkpt_schedules', JSON.stringify(schedules));
     
     const syncSchedules = async () => {
-      setIsLocalUpdate(true);
+      setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
       try {
         const response = await fetch('/api/schedules', {
           method: 'POST',
@@ -253,7 +263,7 @@ const App: React.FC = () => {
           throw new Error(errData.error || `Server error: ${response.status}`);
         }
         setSyncError(null);
-        setIsLocalUpdate(false);
+        setIsLocalUpdate(prev => ({ ...prev, schedules: false }));
       } catch (e: any) {
         console.error("Failed to sync schedules:", e);
         setSyncError(`Gagal menyimpan jadual: ${e.message}`);
@@ -269,7 +279,7 @@ const App: React.FC = () => {
     localStorage.setItem('ipgkpt_lecturers', JSON.stringify(lecturersList));
     
     const syncLecturers = async () => {
-      setIsLocalUpdate(true);
+      setIsLocalUpdate(prev => ({ ...prev, lecturers: true }));
       try {
         const response = await fetch('/api/lecturers', {
           method: 'POST',
@@ -281,7 +291,7 @@ const App: React.FC = () => {
           throw new Error(errData.error || `Server error: ${response.status}`);
         }
         setSyncError(null);
-        setIsLocalUpdate(false);
+        setIsLocalUpdate(prev => ({ ...prev, lecturers: false }));
       } catch (e: any) {
         console.error("Failed to sync lecturers:", e);
         setSyncError(`Gagal menyimpan senarai pensyarah: ${e.message}`);
@@ -486,7 +496,10 @@ const App: React.FC = () => {
     ? records 
     : isRestrictedUser 
       ? [] // Restricted user gets ZERO evaluation records
-      : records.filter(r => r.department === user?.department);
+      : records.filter(r => 
+          r.department === user?.department || 
+          (r.evaluatorName && user?.username && r.evaluatorName.toLowerCase().includes(user.username.toLowerCase()))
+        );
 
   const accessibleLecturers = (user?.role === 'admin' || user?.department === 'SEMUA')
     ? lecturersList 
@@ -592,6 +605,7 @@ const App: React.FC = () => {
               lecturers={accessibleLecturers} 
               userDept={user.department}
               isAdmin={user.role === 'admin' || user.department === 'SEMUA'}
+              username={user.username}
               initialData={editingRecord || undefined} 
             />
           </div>

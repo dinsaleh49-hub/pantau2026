@@ -17,10 +17,11 @@ interface Props {
   lecturers: { name: string; department: string }[];
   userDept: string;
   isAdmin: boolean;
+  username?: string;
   initialData?: EvaluationRecord;
 }
 
-export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept, isAdmin, initialData }) => {
+export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept, isAdmin, username, initialData }) => {
   const [formData, setFormData] = useState({
     campus: CAMPUSES[0],
     department: isAdmin ? '' : userDept,
@@ -29,7 +30,7 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
     code: '',
     credit: '',
     date: new Date().toISOString().split('T')[0],
-    evaluatorName: '',
+    evaluatorName: username || '',
     remarks: ''
   });
 

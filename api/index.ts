@@ -59,35 +59,54 @@ const getRecords = async (req: any, res: any) => {
   if (supabase) {
     try {
       const { data, error } = await supabase.from('epantau_storage').select('content').eq('id', 'records').maybeSingle();
-      if (error) throw error;
+      if (error) {
+        console.error("[API] Supabase error fetching records:", error);
+        throw error;
+      }
       return res.json(data?.content || []);
     } catch (err: any) {
+      console.error("[API] Exception fetching records from Supabase:", err);
       return res.status(500).json({ error: err.message });
     }
   } else {
     try {
       if (fs.existsSync(RECORDS_FILE)) {
-        return res.json(JSON.parse(fs.readFileSync(RECORDS_FILE, "utf-8")));
+        const content = fs.readFileSync(RECORDS_FILE, "utf-8");
+        return res.json(JSON.parse(content));
       }
       res.json([]);
-    } catch (e) { res.json([]); }
+    } catch (e: any) { 
+      console.error("[API] Error reading local records file:", e);
+      res.json([]); 
+    }
   }
 };
 
 const postRecords = async (req: any, res: any) => {
   const records = req.body;
+  console.log(`[API] Saving ${Array.isArray(records) ? records.length : 0} records...`);
   if (supabase) {
     try {
       const { error } = await supabase.from('epantau_storage').upsert({ id: 'records', content: records, updated_at: new Date() });
-      if (error) throw error;
+      if (error) {
+        console.error("[API] Supabase error saving records:", error);
+        throw error;
+      }
       res.json({ success: true });
     } catch (err: any) {
+      console.error("[API] Exception saving records to Supabase:", err);
       res.status(500).json({ error: err.message });
     }
   } else {
     if (process.env.VERCEL) return res.status(503).json({ error: "Supabase required for Vercel persistence" });
-    fs.writeFileSync(RECORDS_FILE, JSON.stringify(records, null, 2));
-    res.json({ success: true });
+    try {
+      fs.writeFileSync(RECORDS_FILE, JSON.stringify(records, null, 2));
+      console.log("[API] Records saved to local file.");
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[API] Error writing local records file:", err);
+      res.status(500).json({ error: err.message });
+    }
   }
 };
 
