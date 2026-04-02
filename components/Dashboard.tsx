@@ -962,7 +962,13 @@ export const Dashboard: React.FC<Props> = ({
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
                          {(isAdminView || canEdit) && (
                            <>
-                             <button onClick={() => handleEditLecturer({ name: item.name, department: item.department })} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Pensyarah"><PencilSquareIcon className="h-4 w-4" /></button>
+                             <button 
+                               onClick={() => handleEditLecturer({ name: item.name, department: item.department })} 
+                               className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[10px] font-bold hover:bg-emerald-100 transition-colors"
+                               title="Ubahsuai Pensyarah"
+                             >
+                               <PencilSquareIcon className="h-3 w-3" /> Kemaskini
+                             </button>
                              {isAdminView && (
                                <button onClick={() => onDeleteLecturer(item.name, item.department)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
                              )}
@@ -1349,6 +1355,15 @@ export const Dashboard: React.FC<Props> = ({
                               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${isNew ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                 {isNew ? 'Baru' : (records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length > 1 ? `${records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length} Rekod` : 'Selesai')}
                               </span>
+                              {(isAdminView || canEdit) && (
+                                <button 
+                                  onClick={() => handleEditLecturer({ name: l.name, department: l.department })} 
+                                  className="p-1 text-emerald-600 hover:text-emerald-800"
+                                  title="Kemaskini Pensyarah"
+                                >
+                                  <PencilSquareIcon className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -1370,6 +1385,15 @@ export const Dashboard: React.FC<Props> = ({
                           <span className="text-xs font-bold text-rose-900">{l.name}</span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">Belum</span>
+                            {(isAdminView || canEdit) && (
+                              <button 
+                                onClick={() => handleEditLecturer({ name: l.name, department: l.department })} 
+                                className="p-1 text-emerald-600 hover:text-emerald-800"
+                                title="Kemaskini Pensyarah"
+                              >
+                                <PencilSquareIcon className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
