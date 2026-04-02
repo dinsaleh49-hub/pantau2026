@@ -30,7 +30,8 @@ import {
   ArchiveBoxArrowDownIcon,
   HandThumbUpIcon,
   ExclamationCircleIcon,
-  UserPlusIcon
+  UserPlusIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
 import { generatePDF, generateSummaryPDF, generateFullDepartmentPDF } from '../services/pdfService';
 import { uploadToGoogleDrive } from '../services/googleDriveService';
@@ -53,6 +54,7 @@ interface Props {
   onUpdateSchedule: (schedule: MonitoringSchedule) => void;
   onAddLecturer: (lecturer: { name: string; department: string }) => void;
   onUpdateLecturer: (oldName: string, oldDept: string, updatedLecturer: { name: string; department: string }) => void;
+  onOpenForm: (initialData?: any) => void;
   onRefresh?: () => void;
   lastSync?: Date | null;
 }
@@ -82,6 +84,7 @@ export const Dashboard: React.FC<Props> = ({
   onUpdateSchedule,
   onAddLecturer,
   onUpdateLecturer,
+  onOpenForm,
   onRefresh,
   lastSync
 }) => {
@@ -868,6 +871,14 @@ export const Dashboard: React.FC<Props> = ({
                     </select>
                   </div>
                 )}
+                {selectedDeptFilter !== 'all' && (
+                  <button 
+                    onClick={() => onOpenForm({ department: selectedDeptFilter })}
+                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase shadow-md hover:bg-indigo-700 transition-all"
+                  >
+                    <ClipboardDocumentCheckIcon className="h-4 w-4" /> Borang {selectedDeptFilter}
+                  </button>
+                )}
                 <div className="relative">
                   <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input type="text" placeholder="Cari nama..." value={statusSearchTerm} onChange={e => setStatusSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
@@ -953,6 +964,13 @@ export const Dashboard: React.FC<Props> = ({
                            </>
                          )}
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
+                         <button 
+                           onClick={() => onOpenForm({ lecturerName: item.name, department: item.department })} 
+                           className="p-1.5 text-emerald-600" 
+                           title="Isi Borang Penilaian"
+                         >
+                           <ClipboardDocumentCheckIcon className="h-4 w-4" />
+                         </button>
                          {isAdminView && (
                            <>
                              <button onClick={() => handleEditLecturer({ name: item.name, department: item.department })} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Pensyarah"><PencilSquareIcon className="h-4 w-4" /></button>
@@ -1070,6 +1088,13 @@ export const Dashboard: React.FC<Props> = ({
 
                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
                       <span>{dept.monitored} Dipantau</span>
+                      <button 
+                        onClick={() => onOpenForm({ department: dept.name })}
+                        className="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-700 transition-all shadow-sm"
+                        title="Isi Borang Penilaian Baru untuk Jabatan Ini"
+                      >
+                        <ClipboardDocumentCheckIcon className="h-3 w-3" /> Borang
+                      </button>
                       <button 
                         onClick={() => handleBulkExportToDrive(dept.name)}
                         disabled={isBulkSaving === dept.name}
@@ -1206,6 +1231,14 @@ export const Dashboard: React.FC<Props> = ({
                 </div>
               </div>
             )}
+            {analysisDeptFilter !== 'all' && (
+              <button 
+                onClick={() => onOpenForm({ department: analysisDeptFilter })}
+                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+              >
+                <ClipboardDocumentCheckIcon className="h-5 w-5" /> Isi Borang {analysisDeptFilter}
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1328,9 +1361,18 @@ export const Dashboard: React.FC<Props> = ({
                               <span className={`text-xs font-bold ${isNew ? 'text-indigo-900' : 'text-emerald-900'}`}>{l.name}</span>
                               {isNew && <SparklesIcon className="h-3 w-3 text-indigo-500" />}
                             </div>
-                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${isNew ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                              {isNew ? 'Baru' : (records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length > 1 ? `${records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length} Rekod` : 'Selesai')}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${isNew ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                {isNew ? 'Baru' : (records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length > 1 ? `${records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length} Rekod` : 'Selesai')}
+                              </span>
+                              <button 
+                                onClick={() => onOpenForm({ lecturerName: l.name, department: l.department })}
+                                className="p-1 bg-white border border-slate-200 rounded text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                title="Isi Borang"
+                              >
+                                <ClipboardDocumentCheckIcon className="h-3 w-3" />
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -1349,7 +1391,16 @@ export const Dashboard: React.FC<Props> = ({
                       .map(l => (
                         <div key={l.name} className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl flex items-center justify-between">
                           <span className="text-xs font-bold text-rose-900">{l.name}</span>
-                          <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">Belum</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">Belum</span>
+                            <button 
+                              onClick={() => onOpenForm({ lecturerName: l.name, department: l.department })}
+                              className="p-1 bg-white border border-slate-200 rounded text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="Isi Borang"
+                            >
+                              <ClipboardDocumentCheckIcon className="h-3 w-3" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     {allLecturers.filter(l => l.department === selectedDeptDetails && !records.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase())).length === 0 && (

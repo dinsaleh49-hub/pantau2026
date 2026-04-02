@@ -570,6 +570,14 @@ const App: React.FC = () => {
             onUpdateSchedule={handleUpdateSchedule}
             onAddLecturer={handleAddLecturer}
             onUpdateLecturer={handleUpdateLecturer}
+            onOpenForm={(data) => { 
+              if (data) {
+                setEditingRecord(data as EvaluationRecord);
+              } else {
+                setEditingRecord(null);
+              }
+              setView('form'); 
+            }}
             onRefresh={() => fetchData()}
             lastSync={lastSync}
           />
