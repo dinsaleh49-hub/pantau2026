@@ -55,6 +55,7 @@ interface Props {
   onUpdateLecturer: (oldName: string, oldDept: string, updatedLecturer: { name: string; department: string }) => void;
   onRefresh?: () => void;
   lastSync?: Date | null;
+  userDept?: string;
 }
 
 const DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1I5-K1Yv3SnFMBzUQtQnPzR82AeHWJqNw?usp=sharing";
@@ -74,6 +75,7 @@ export const Dashboard: React.FC<Props> = ({
   allLecturers,
   userRole,
   username,
+  userDept,
   onDeleteRecord,
   onDeleteLecturer,
   onDeleteSchedule,
@@ -451,7 +453,7 @@ export const Dashboard: React.FC<Props> = ({
 
   const handleNewLecturer = () => {
     setEditingLecturer(null);
-    setLecturerFormData({ name: '', department: '', isKJ: false });
+    setLecturerFormData({ name: '', department: isAdminView ? '' : (userDept || ''), isKJ: false });
     setIsOtherDept(false);
     setShowLecturerModal(true);
   };
@@ -875,7 +877,7 @@ export const Dashboard: React.FC<Props> = ({
                   <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input type="text" placeholder="Cari nama..." value={statusSearchTerm} onChange={e => setStatusSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
                 </div>
-                {userRole === 'admin' && (
+                {(userRole === 'admin' || canEdit) && (
                   <button onClick={handleNewLecturer} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-indigo-700 transition-all">
                     <UserPlusIcon className="h-4 w-4" /> Tambah Pensyarah
                   </button>
@@ -958,10 +960,12 @@ export const Dashboard: React.FC<Props> = ({
                            </>
                          )}
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
-                         {isAdminView && (
+                         {(isAdminView || canEdit) && (
                            <>
                              <button onClick={() => handleEditLecturer({ name: item.name, department: item.department })} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Pensyarah"><PencilSquareIcon className="h-4 w-4" /></button>
-                             <button onClick={() => onDeleteLecturer(item.name, item.department)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
+                             {isAdminView && (
+                               <button onClick={() => onDeleteLecturer(item.name, item.department)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
+                             )}
                            </>
                          )}
                       </td>
@@ -1467,6 +1471,7 @@ export const Dashboard: React.FC<Props> = ({
                   {!isOtherDept ? (
                     <select 
                       required
+                      disabled={!isAdminView}
                       value={lecturerFormData.department}
                       onChange={e => {
                         if (e.target.value === 'OTHER') {
@@ -1476,7 +1481,7 @@ export const Dashboard: React.FC<Props> = ({
                           setLecturerFormData({...lecturerFormData, department: e.target.value});
                         }
                       }}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all appearance-none"
+                      className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all appearance-none ${!isAdminView ? 'cursor-not-allowed opacity-70' : ''}`}
                     >
                       <option value="" disabled>Pilih Jabatan</option>
                       {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}

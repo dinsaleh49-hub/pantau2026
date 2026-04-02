@@ -267,10 +267,10 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Jabatan / Unit</label>
                 <select 
                   required={!isOtherDepartment}
-                  disabled={!isAdmin && !isOtherLecturer}
+                  disabled={!isAdmin && !isOtherLecturer && !initialData}
                   value={isOtherDepartment ? 'OTHER' : (DEPARTMENTS.includes(formData.department) ? formData.department : '')} 
                   onChange={e => handleDepartmentChange(e.target.value)}
-                  className={`w-full px-4 py-2 border border-slate-200 rounded-lg text-sm bg-white mb-2 ${!isAdmin && !isOtherLecturer ? 'bg-slate-50 cursor-not-allowed' : ''}`}
+                  className={`w-full px-4 py-2 border border-slate-200 rounded-lg text-sm bg-white mb-2 ${!isAdmin && !isOtherLecturer && !initialData ? 'bg-slate-50 cursor-not-allowed' : ''}`}
                 >
                   <option value="" disabled>Pilih Jabatan</option>
                   {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}

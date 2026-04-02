@@ -360,21 +360,28 @@ const App: React.FC = () => {
   });
 
   const handleAddRecord = (record: EvaluationRecord) => {
-    // Automatically add lecturer to list if they don't exist
+    // Automatically add or update lecturer in the list
     const trimmedName = record.lecturerName.trim();
     const normalizedRecord = { ...record, lecturerName: trimmedName };
     
-    const lecturerExists = lecturersList.some(l => 
-      l.name.toLowerCase() === trimmedName.toLowerCase() && 
-      l.department === record.department
-    );
-    if (!lecturerExists && trimmedName) {
-      const newLecturer = { 
-        name: trimmedName, 
-        department: record.department 
-      };
-      setLecturersList(prev => [...prev, newLecturer]);
-    }
+    setLecturersList(prev => {
+      const existingLecturerIndex = prev.findIndex(l => l.name.toLowerCase() === trimmedName.toLowerCase());
+      
+      if (existingLecturerIndex !== -1) {
+        // Lecturer exists by name, check if department is different
+        if (prev[existingLecturerIndex].department !== record.department) {
+          // Update the existing lecturer's department
+          const updatedList = [...prev];
+          updatedList[existingLecturerIndex] = { ...updatedList[existingLecturerIndex], department: record.department };
+          return updatedList;
+        }
+        return prev; // No change needed
+      } else if (trimmedName) {
+        // New lecturer entirely
+        return [...prev, { name: trimmedName, department: record.department }];
+      }
+      return prev;
+    });
 
     setRecords((prev: EvaluationRecord[]) => {
       const exists = prev.some((r: EvaluationRecord) => r.id === record.id);
@@ -415,8 +422,9 @@ const App: React.FC = () => {
   };
 
   const handleUpdateLecturer = (oldName: string, oldDept: string, updatedLecturer: Lecturer) => {
-    if (user?.role !== 'admin') {
-      alert('Hanya Admin dibenarkan mengemaskini maklumat pensyarah.');
+    const isMonitor = user?.role === 'admin' || (user?.role === 'user' && user?.username.toLowerCase() !== 'pensyarah');
+    if (!isMonitor) {
+      alert('Hanya Admin atau Pemantau dibenarkan mengemaskini maklumat pensyarah.');
       return;
     }
     setLecturersList(prev => prev.map(l => (l.name === oldName && l.department === oldDept) ? updatedLecturer : l));
@@ -429,8 +437,9 @@ const App: React.FC = () => {
   };
 
   const handleAddLecturer = (lecturer: Lecturer) => {
-    if (user?.role !== 'admin') {
-      alert('Hanya Admin dibenarkan menambah pensyarah.');
+    const isMonitor = user?.role === 'admin' || (user?.role === 'user' && user?.username.toLowerCase() !== 'pensyarah');
+    if (!isMonitor) {
+      alert('Hanya Admin atau Pemantau dibenarkan menambah pensyarah.');
       return;
     }
     setLecturersList(prev => {
@@ -584,6 +593,7 @@ const App: React.FC = () => {
             allLecturers={lecturersList}
             userRole={user.role}
             username={user.username}
+            userDept={user.department}
             onDeleteRecord={openDeleteRecordConfirm} 
             onDeleteLecturer={openDeleteLecturerConfirm}
             onDeleteSchedule={openDeleteScheduleConfirm}
