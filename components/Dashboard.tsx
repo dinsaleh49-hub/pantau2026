@@ -820,13 +820,6 @@ export const Dashboard: React.FC<Props> = ({
                                 >
                                   <TrashIcon className="h-4 w-4" />
                                 </button>
-                                <button 
-                                  onClick={() => onDeleteLecturer(record.lecturerName, record.department)} 
-                                  className="p-1.5 text-slate-300 hover:text-rose-600" 
-                                  title="Padam Pensyarah dari Sistem"
-                                >
-                                  <UsersIcon className="h-4 w-4" />
-                                </button>
                               </>
                             )}
                           </td>
