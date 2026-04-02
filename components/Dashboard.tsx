@@ -1044,12 +1044,21 @@ export const Dashboard: React.FC<Props> = ({
                     {dept.kjMonitored && <div className="absolute top-2 right-2 text-rose-600"><CheckBadgeIcon className="h-5 w-5" /></div>}
                     <div className="flex justify-between items-center">
                       <h4 className="text-sm font-black text-slate-800">{dept.name}</h4>
-                      <button 
-                        onClick={() => setSelectedDeptDetails(dept.name)}
-                        className="text-[10px] font-black text-indigo-600 hover:underline"
-                      >
-                        Lihat Semua ({dept.total})
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => onOpenForm({ department: dept.name })}
+                          className="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-700 transition-all shadow-sm"
+                          title="Isi Borang Penilaian Baru untuk Jabatan Ini"
+                        >
+                          <ClipboardDocumentCheckIcon className="h-3 w-3" /> Borang
+                        </button>
+                        <button 
+                          onClick={() => setSelectedDeptDetails(dept.name)}
+                          className="text-[10px] font-black text-indigo-600 hover:underline"
+                        >
+                          Lihat Semua ({dept.total})
+                        </button>
+                      </div>
                     </div>
                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
                       <span>{dept.monitored} / {dept.total} Dipantau</span>
@@ -1088,13 +1097,6 @@ export const Dashboard: React.FC<Props> = ({
 
                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
                       <span>{dept.monitored} Dipantau</span>
-                      <button 
-                        onClick={() => onOpenForm({ department: dept.name })}
-                        className="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-700 transition-all shadow-sm"
-                        title="Isi Borang Penilaian Baru untuk Jabatan Ini"
-                      >
-                        <ClipboardDocumentCheckIcon className="h-3 w-3" /> Borang
-                      </button>
                       <button 
                         onClick={() => handleBulkExportToDrive(dept.name)}
                         disabled={isBulkSaving === dept.name}
