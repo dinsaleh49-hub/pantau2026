@@ -484,8 +484,9 @@ const App: React.FC = () => {
   };
 
   const handleConfirmedDelete = () => {
-    if (user?.role !== 'admin' && (confirmModal.type === 'record' || confirmModal.type === 'lecturer')) {
-      alert('Hanya Admin dibenarkan memadam rekod atau pensyarah.');
+    const isMonitor = user?.role === 'admin' || (user?.role === 'user' && user?.username.toLowerCase() !== 'pensyarah');
+    if (!isMonitor && (confirmModal.type === 'record' || confirmModal.type === 'lecturer')) {
+      alert('Hanya Admin atau Pemantau dibenarkan memadam rekod atau pensyarah.');
       setConfirmModal(prev => ({ ...prev, isOpen: false }));
       return;
     }
