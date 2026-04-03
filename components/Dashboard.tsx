@@ -1361,24 +1361,7 @@ export const Dashboard: React.FC<Props> = ({
                               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${isNew ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                 {isNew ? 'Baru' : (records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length > 1 ? `${records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length} Rekod` : 'Selesai')}
                               </span>
-                              {(isAdminView || canEdit) && (
-                                <>
-                                  <button 
-                                    onClick={() => handleEditLecturer({ name: l.name, department: l.department })} 
-                                    className="p-1 text-emerald-600 hover:text-emerald-800"
-                                    title="Kemaskini Pensyarah"
-                                  >
-                                    <PencilSquareIcon className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button 
-                                    onClick={() => onDeleteLecturer(l.name, l.department)} 
-                                    className="p-1 text-slate-300 hover:text-rose-600"
-                                    title="Padam Pensyarah"
-                                  >
-                                    <TrashIcon className="h-3.5 w-3.5" />
-                                  </button>
-                                </>
-                              )}
+                              {/* Action buttons removed */}
                             </div>
                           </div>
                         );
@@ -1400,24 +1383,7 @@ export const Dashboard: React.FC<Props> = ({
                           <span className="text-xs font-bold text-rose-900">{l.name}</span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">Belum</span>
-                            {(isAdminView || canEdit) && (
-                              <>
-                                <button 
-                                  onClick={() => handleEditLecturer({ name: l.name, department: l.department })} 
-                                  className="p-1 text-emerald-600 hover:text-emerald-800"
-                                  title="Kemaskini Pensyarah"
-                                >
-                                  <PencilSquareIcon className="h-3.5 w-3.5" />
-                                </button>
-                                <button 
-                                  onClick={() => onDeleteLecturer(l.name, l.department)} 
-                                  className="p-1 text-slate-300 hover:text-rose-600"
-                                  title="Padam Pensyarah"
-                                >
-                                  <TrashIcon className="h-3.5 w-3.5" />
-                                </button>
-                              </>
-                            )}
+                            {/* Action buttons removed */}
                           </div>
                         </div>
                       ))}
