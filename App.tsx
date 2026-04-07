@@ -516,23 +516,63 @@ const App: React.FC = () => {
     });
   };
 
-  const handleConfirmedDelete = () => {
+  const handleConfirmedDelete = async () => {
     const isMonitor = user?.role === 'admin' || (user?.role === 'user' && user?.username.toLowerCase() !== 'pensyarah');
     if (!isMonitor && (confirmModal.type === 'record' || confirmModal.type === 'lecturer')) {
       alert('Hanya Admin atau Pemantau dibenarkan memadam rekod atau pensyarah.');
       setConfirmModal(prev => ({ ...prev, isOpen: false }));
       return;
     }
+
+    let updatedRecords = [...records];
+    let updatedLecturers = [...lecturersList];
+    let updatedSchedules = [...schedules];
+
     if (confirmModal.type === 'record' && confirmModal.targetId) {
-      setRecords((prev: EvaluationRecord[]) => prev.filter((r: EvaluationRecord) => r.id !== confirmModal.targetId));
+      updatedRecords = records.filter((r: EvaluationRecord) => r.id !== confirmModal.targetId);
+      setRecords(updatedRecords);
+      setIsLocalUpdate(prev => ({ ...prev, records: true }));
     } else if (confirmModal.type === 'lecturer' && confirmModal.targetId) {
       const [name, dept] = confirmModal.targetId.split('|');
-      setLecturersList((prev: Lecturer[]) => prev.filter((l: Lecturer) => !(l.name === name && l.department === dept)));
+      updatedLecturers = lecturersList.filter((l: Lecturer) => !(l.name === name && l.department === dept));
+      setLecturersList(updatedLecturers);
+      setIsLocalUpdate(prev => ({ ...prev, lecturers: true }));
     } else if (confirmModal.type === 'schedule' && confirmModal.targetId) {
-      setSchedules((prev: MonitoringSchedule[]) => prev.filter((s: MonitoringSchedule) => s.id !== confirmModal.targetId));
+      updatedSchedules = schedules.filter((s: MonitoringSchedule) => s.id !== confirmModal.targetId);
+      setSchedules(updatedSchedules);
+      setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
     }
+
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
-    showNotification('Rekod telah berjaya dipadamkan.');
+
+    // Sync to server
+    try {
+      setIsSyncing(true);
+      await Promise.all([
+        fetch('/api/records', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedRecords)
+        }),
+        fetch('/api/lecturers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedLecturers)
+        }),
+        fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedSchedules)
+        })
+      ]);
+      setIsLocalUpdate({ records: false, schedules: false, lecturers: false });
+      showNotification('Rekod telah berjaya dipadamkan dari sistem dan pelayan.');
+    } catch (error: any) {
+      console.error("Sync error during deletion:", error);
+      showNotification('Rekod dipadam secara lokal tetapi gagal dikemaskini di pelayan.', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Restricted user identification

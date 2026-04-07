@@ -359,24 +359,4 @@ export const EVALUATION_CRITERIA: Criterion[] = [
   { id: '6a', category: '6. Sahsiah', text: 'Pensyarah berusaha membina sahsiah guru yang penyayang, prihatin, penyabar dan bertanggungjawab.' },
 ];
 
-export const INITIAL_RECORDS: EvaluationRecord[] = [
-  {
-    id: '1',
-    timestamp: Date.now(),
-    campus: 'IPG Kampus Pendidikan Teknik',
-    department: 'Jabatan Ilmu Pendidikan',
-    lecturerName: 'Dr. Ahmad Bin Ismail',
-    course: 'Programming Fundamentals',
-    code: 'CS101',
-    credit: '3',
-    date: '2023-11-20',
-    evaluatorName: 'Dr. Kamarulzaman bin Ab. Aziz (KJ)',
-    scores: { 
-      '1a': 4, '1b': 5, '1c': 4, '1d': 4, '1e': 4, 
-      '2a': 4, '2b': 5, '2c': 4, '2d': 3, '2e': 5, '2f': 4, 
-      '3a': 4, '3b': 5, '4a': 5, '5a': 4, '6a': 5 
-    },
-    itemRemarks: {},
-    remarks: 'Penyampaian sangat berkesan dan melibatkan ramai pelajar aktif.'
-  }
-];
+export const INITIAL_RECORDS: EvaluationRecord[] = [];
