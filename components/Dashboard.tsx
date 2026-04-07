@@ -968,16 +968,8 @@ export const Dashboard: React.FC<Props> = ({
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
                          {(isAdminView || canEdit) && (
                            <>
-                             <button 
-                               onClick={() => handleEditLecturer({ name: item.name, department: item.department })} 
-                               className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[10px] font-bold hover:bg-emerald-100 transition-colors"
-                               title="Ubahsuai Pensyarah"
-                             >
-                               <PencilSquareIcon className="h-3 w-3" /> Kemaskini
-                             </button>
-                             {(isAdminView || canEdit) && (
-                               <button onClick={() => onDeleteLecturer(item.name, item.department)} className="p-1.5 text-slate-300 hover:text-rose-600" title="Padam Pensyarah"><TrashIcon className="h-4 w-4" /></button>
-                             )}
+
+
                            </>
                          )}
                       </td>

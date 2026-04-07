@@ -19,9 +19,10 @@ interface Props {
   isAdmin: boolean;
   username?: string;
   initialData?: EvaluationRecord;
+  onNotification?: (message: string, type: 'success' | 'error') => void;
 }
 
-export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept, isAdmin, username, initialData }) => {
+export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept, isAdmin, username, initialData, onNotification }) => {
   const [formData, setFormData] = useState({
     campus: CAMPUSES[0],
     department: isAdmin ? '' : userDept,
@@ -150,13 +151,23 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.keys(scores).length < EVALUATION_CRITERIA.length) {
-      alert('Sila lengkapkan semua kriteria penilaian.');
+    
+    const missingCriteria = EVALUATION_CRITERIA.filter(c => !scores[c.id]);
+    if (missingCriteria.length > 0) {
+      if (onNotification) {
+        onNotification(`Sila lengkapkan semua kriteria penilaian. (${missingCriteria.length} lagi)`, 'error');
+      } else {
+        alert('Sila lengkapkan semua kriteria penilaian.');
+      }
       return;
     }
 
     if (!lecturerSig || !evaluatorSig) {
-      alert('Sila pastikan kedua-dua pihak telah menurunkan tandatangan digital.');
+      if (onNotification) {
+        onNotification('Sila pastikan kedua-dua pihak telah menurunkan tandatangan digital.', 'error');
+      } else {
+        alert('Sila pastikan kedua-dua pihak telah menurunkan tandatangan digital.');
+      }
       return;
     }
 
@@ -175,14 +186,27 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
     
     // Simulate a small delay for better UX feedback
     setTimeout(() => {
-      onSubmit(record);
-      setIsSubmitting(false);
+      try {
+        onSubmit(record);
+      } catch (error) {
+        console.error("Error in onSubmit:", error);
+        if (onNotification) {
+          onNotification('Ralat semasa menyimpan rekod.', 'error');
+        }
+      } finally {
+        setIsSubmitting(false);
+      }
     }, 800);
   };
 
   const handleViewPDF = () => {
-    if (Object.keys(scores).length < EVALUATION_CRITERIA.length) {
-      alert('Sila lengkapkan semua kriteria penilaian sebelum melihat PDF.');
+    const missingCriteria = EVALUATION_CRITERIA.filter(c => !scores[c.id]);
+    if (missingCriteria.length > 0) {
+      if (onNotification) {
+        onNotification(`Sila lengkapkan semua kriteria penilaian sebelum melihat PDF. (${missingCriteria.length} lagi)`, 'error');
+      } else {
+        alert('Sila lengkapkan semua kriteria penilaian sebelum melihat PDF.');
+      }
       return;
     }
 

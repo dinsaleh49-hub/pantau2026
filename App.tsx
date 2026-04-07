@@ -360,6 +360,9 @@ const App: React.FC = () => {
   });
 
   const handleAddRecord = (record: EvaluationRecord) => {
+    // Set local update flag immediately to prevent polling overwrite
+    setIsLocalUpdate(prev => ({ ...prev, records: true }));
+    
     // Automatically add or update lecturer in the list
     const trimmedName = record.lecturerName.trim();
     const normalizedRecord = { ...record, lecturerName: trimmedName };
@@ -622,6 +625,7 @@ const App: React.FC = () => {
               isAdmin={user.role === 'admin' || user.department === 'SEMUA'}
               username={user.username}
               initialData={editingRecord || undefined} 
+              onNotification={showNotification}
             />
           </div>
         )}
