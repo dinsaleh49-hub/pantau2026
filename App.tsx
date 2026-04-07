@@ -359,54 +359,84 @@ const App: React.FC = () => {
     message: ''
   });
 
-  const handleAddRecord = (record: EvaluationRecord) => {
-    // Set local update flag immediately to prevent polling overwrite
+  const handleAddRecord = async (record: EvaluationRecord) => {
+    // Set local update flag immediately
     setIsLocalUpdate(prev => ({ ...prev, records: true }));
     
-    // Automatically add or update lecturer in the list
     const trimmedName = record.lecturerName.trim();
     const normalizedRecord = { ...record, lecturerName: trimmedName };
     
-    setLecturersList(prev => {
-      const existingLecturerIndex = prev.findIndex(l => l.name.toLowerCase() === trimmedName.toLowerCase());
-      
-      if (existingLecturerIndex !== -1) {
-        // Lecturer exists by name, check if department is different
-        if (prev[existingLecturerIndex].department !== record.department) {
-          // Update the existing lecturer's department
-          const updatedList = [...prev];
-          updatedList[existingLecturerIndex] = { ...updatedList[existingLecturerIndex], department: record.department };
-          return updatedList;
-        }
-        return prev; // No change needed
-      } else if (trimmedName) {
-        // New lecturer entirely
-        return [...prev, { name: trimmedName, department: record.department }];
+    // Update local states first for immediate UI feedback
+    const updatedLecturers = [...lecturersList];
+    const existingLecturerIndex = updatedLecturers.findIndex(l => l.name.toLowerCase() === trimmedName.toLowerCase());
+    
+    if (existingLecturerIndex !== -1) {
+      if (updatedLecturers[existingLecturerIndex].department !== record.department) {
+        updatedLecturers[existingLecturerIndex] = { ...updatedLecturers[existingLecturerIndex], department: record.department };
       }
-      return prev;
-    });
+    } else if (trimmedName) {
+      updatedLecturers.push({ name: trimmedName, department: record.department });
+    }
+    
+    const updatedRecords = records.some(r => r.id === record.id)
+      ? records.map(r => r.id === record.id ? normalizedRecord : r)
+      : [normalizedRecord, ...records];
 
-    setRecords((prev: EvaluationRecord[]) => {
-      const exists = prev.some((r: EvaluationRecord) => r.id === record.id);
-      if (exists) return prev.map((r: EvaluationRecord) => r.id === record.id ? normalizedRecord : r);
-      return [normalizedRecord, ...prev];
-    });
+    const updatedSchedules = schedules.map(s => (
+      s.lecturerName.toLowerCase() === normalizedRecord.lecturerName.toLowerCase() && 
+      s.department === normalizedRecord.department &&
+      s.date === normalizedRecord.date
+    ) ? { ...s, status: 'Completed' as const } : s);
 
-    // If there's a matching schedule, mark it as completed
-    setSchedules((prev: MonitoringSchedule[]) => 
-      prev.map(s => (
-        s.lecturerName.toLowerCase() === normalizedRecord.lecturerName.toLowerCase() && 
-        s.department === normalizedRecord.department &&
-        s.date === normalizedRecord.date
-      ) 
-        ? { ...s, status: 'Completed' as const } 
-        : s
-      )
-    );
+    // Update state
+    setLecturersList(updatedLecturers);
+    setRecords(updatedRecords);
+    setSchedules(updatedSchedules);
 
-    setEditingRecord(null);
-    setView('dashboard');
-    showNotification('Rekod penilaian telah berjaya disimpan ke dalam sistem.');
+    // Save to localStorage immediately
+    localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
+    localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+    localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+
+    // Attempt to sync to server immediately and wait for it
+    try {
+      setIsSyncing(true);
+      const [recRes, lecRes, schRes] = await Promise.all([
+        fetch('/api/records', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedRecords)
+        }),
+        fetch('/api/lecturers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedLecturers)
+        }),
+        fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedSchedules)
+        })
+      ]);
+
+      if (!recRes.ok || !lecRes.ok || !schRes.ok) {
+        throw new Error('Gagal menyimpan ke pelayan pusat.');
+      }
+
+      setIsLocalUpdate({ records: false, schedules: false, lecturers: false });
+      setSyncError(null);
+      setLastSync(new Date());
+      showNotification('Rekod penilaian telah berjaya disimpan ke dalam sistem dan pelayan.');
+    } catch (error: any) {
+      console.error("Sync error during submission:", error);
+      setSyncError(`Rekod disimpan secara lokal tetapi gagal dihantar ke pelayan: ${error.message}`);
+      showNotification('Rekod disimpan secara lokal. Ia akan dihantar ke pelayan apabila talian pulih.', 'error');
+      // We don't throw here because we want the UI to proceed since it's saved in localStorage
+    } finally {
+      setIsSyncing(false);
+      setEditingRecord(null);
+      setView('dashboard');
+    }
   };
 
   const handleAddSchedule = (schedule: MonitoringSchedule) => {

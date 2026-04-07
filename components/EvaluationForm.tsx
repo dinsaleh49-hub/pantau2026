@@ -13,7 +13,7 @@ import { generatePDF } from '../services/pdfService';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 
 interface Props {
-  onSubmit: (record: EvaluationRecord) => void;
+  onSubmit: (record: EvaluationRecord) => Promise<void> | void;
   lecturers: { name: string; department: string }[];
   userDept: string;
   isAdmin: boolean;
@@ -184,10 +184,10 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
     
     setIsSubmitting(true);
     
-    // Simulate a small delay for better UX feedback
-    setTimeout(() => {
+    // Use a small delay for better UX feedback, then await the submission
+    setTimeout(async () => {
       try {
-        onSubmit(record);
+        await onSubmit(record);
       } catch (error) {
         console.error("Error in onSubmit:", error);
         if (onNotification) {
