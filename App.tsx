@@ -210,96 +210,10 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchData();
 
-    // Polling every 10 seconds for faster sync across devices
-    const interval = setInterval(() => fetchData(true), 10000);
+    // Polling every 15 seconds for faster sync across devices
+    const interval = setInterval(() => fetchData(true), 15000);
     return () => clearInterval(interval);
   }, [fetchData]);
-
-  // Effect for syncing records to server
-  useEffect(() => {
-    if (isInitialLoad.current) return;
-    
-    localStorage.setItem('ipgkpt_records', JSON.stringify(records));
-    
-    const syncRecords = async () => {
-      setIsLocalUpdate(prev => ({ ...prev, records: true }));
-      try {
-        const response = await fetch('/api/records', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(records)
-        });
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Server error: ${response.status}`);
-        }
-        setSyncError(null);
-        setIsLocalUpdate(prev => ({ ...prev, records: false }));
-      } catch (e: any) {
-        console.error("Failed to sync records:", e);
-        setSyncError(`Gagal menyimpan rekod: ${e.message}`);
-      }
-    };
-    
-    syncRecords();
-  }, [records]);
-
-  // Effect for syncing schedules to server
-  useEffect(() => {
-    if (isInitialLoad.current) return;
-
-    localStorage.setItem('ipgkpt_schedules', JSON.stringify(schedules));
-    
-    const syncSchedules = async () => {
-      setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
-      try {
-        const response = await fetch('/api/schedules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(schedules)
-        });
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Server error: ${response.status}`);
-        }
-        setSyncError(null);
-        setIsLocalUpdate(prev => ({ ...prev, schedules: false }));
-      } catch (e: any) {
-        console.error("Failed to sync schedules:", e);
-        setSyncError(`Gagal menyimpan jadual: ${e.message}`);
-      }
-    };
-
-    syncSchedules();
-  }, [schedules]);
-
-  useEffect(() => {
-    if (isInitialLoad.current) return;
-
-    localStorage.setItem('ipgkpt_lecturers', JSON.stringify(lecturersList));
-    
-    const syncLecturers = async () => {
-      setIsLocalUpdate(prev => ({ ...prev, lecturers: true }));
-      try {
-        const response = await fetch('/api/lecturers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lecturersList)
-        });
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Server error: ${response.status}`);
-        }
-        setSyncError(null);
-        setIsLocalUpdate(prev => ({ ...prev, lecturers: false }));
-      } catch (e: any) {
-        console.error("Failed to sync lecturers:", e);
-        setSyncError(`Gagal menyimpan senarai pensyarah: ${e.message}`);
-      }
-    };
-
-    syncLecturers();
-  }, [lecturersList]);
 
   const handleLogin = (userData: { username: string; department: string; role: 'admin' | 'user' }, remember: boolean) => {
     setUser(userData);
@@ -359,6 +273,52 @@ const App: React.FC = () => {
     message: ''
   });
 
+  const syncData = async (
+    updatedRecords: EvaluationRecord[], 
+    updatedSchedules: MonitoringSchedule[], 
+    updatedLecturers: Lecturer[]
+  ) => {
+    // Update localStorage immediately
+    localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
+    localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+    localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+
+    try {
+      setIsSyncing(true);
+      const [recRes, lecRes, schRes] = await Promise.all([
+        fetch('/api/records', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedRecords)
+        }),
+        fetch('/api/lecturers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedLecturers)
+        }),
+        fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedSchedules)
+        })
+      ]);
+
+      if (!recRes.ok || !lecRes.ok || !schRes.ok) {
+        throw new Error('Gagal menyimpan ke pelayan pusat.');
+      }
+
+      setIsLocalUpdate({ records: false, schedules: false, lecturers: false });
+      setSyncError(null);
+      setLastSync(new Date());
+    } catch (error: any) {
+      console.error("Sync error:", error);
+      setSyncError(`Data disimpan secara lokal tetapi gagal dihantar ke pelayan: ${error.message}`);
+      showNotification('Data disimpan secara lokal. Ia akan dihantar ke pelayan apabila talian pulih.', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleAddRecord = async (record: EvaluationRecord) => {
     // Set local update flag immediately
     setIsLocalUpdate(prev => ({ ...prev, records: true }));
@@ -393,59 +353,27 @@ const App: React.FC = () => {
     setRecords(updatedRecords);
     setSchedules(updatedSchedules);
 
-    // Save to localStorage immediately
-    localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
-    localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
-    localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
-
-    // Attempt to sync to server immediately and wait for it
-    try {
-      setIsSyncing(true);
-      const [recRes, lecRes, schRes] = await Promise.all([
-        fetch('/api/records', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedRecords)
-        }),
-        fetch('/api/lecturers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedLecturers)
-        }),
-        fetch('/api/schedules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedSchedules)
-        })
-      ]);
-
-      if (!recRes.ok || !lecRes.ok || !schRes.ok) {
-        throw new Error('Gagal menyimpan ke pelayan pusat.');
-      }
-
-      setIsLocalUpdate({ records: false, schedules: false, lecturers: false });
-      setSyncError(null);
-      setLastSync(new Date());
-      showNotification('Rekod penilaian telah berjaya disimpan ke dalam sistem dan pelayan.');
-    } catch (error: any) {
-      console.error("Sync error during submission:", error);
-      setSyncError(`Rekod disimpan secara lokal tetapi gagal dihantar ke pelayan: ${error.message}`);
-      showNotification('Rekod disimpan secara lokal. Ia akan dihantar ke pelayan apabila talian pulih.', 'error');
-      // We don't throw here because we want the UI to proceed since it's saved in localStorage
-    } finally {
-      setIsSyncing(false);
-      setEditingRecord(null);
-      setView('dashboard');
-    }
+    // Sync
+    await syncData(updatedRecords, updatedSchedules, updatedLecturers);
+    
+    setEditingRecord(null);
+    setView('dashboard');
+    showNotification('Rekod penilaian telah berjaya disimpan.');
   };
 
-  const handleAddSchedule = (schedule: MonitoringSchedule) => {
-    setSchedules((prev: MonitoringSchedule[]) => [schedule, ...prev]);
+  const handleAddSchedule = async (schedule: MonitoringSchedule) => {
+    const updatedSchedules = [schedule, ...schedules];
+    setSchedules(updatedSchedules);
+    setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
+    await syncData(records, updatedSchedules, lecturersList);
     showNotification('Jadual pemantauan telah berjaya didaftarkan.');
   };
 
-  const handleUpdateSchedule = (updatedSchedule: MonitoringSchedule) => {
-    setSchedules((prev: MonitoringSchedule[]) => prev.map((s: MonitoringSchedule) => s.id === updatedSchedule.id ? updatedSchedule : s));
+  const handleUpdateSchedule = async (updatedSchedule: MonitoringSchedule) => {
+    const updatedSchedules = schedules.map((s: MonitoringSchedule) => s.id === updatedSchedule.id ? updatedSchedule : s);
+    setSchedules(updatedSchedules);
+    setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
+    await syncData(records, updatedSchedules, lecturersList);
     showNotification('Jadual pemantauan telah berjaya dikemaskini.');
   };
 
@@ -454,34 +382,47 @@ const App: React.FC = () => {
     setView('form');
   };
 
-  const handleUpdateLecturer = (oldName: string, oldDept: string, updatedLecturer: Lecturer) => {
+  const handleUpdateLecturer = async (oldName: string, oldDept: string, updatedLecturer: Lecturer) => {
     const isMonitor = user?.role === 'admin' || (user?.role === 'user' && user?.username.toLowerCase() !== 'pensyarah');
     if (!isMonitor) {
       alert('Hanya Admin atau Pemantau dibenarkan mengemaskini maklumat pensyarah.');
       return;
     }
-    setLecturersList(prev => prev.map(l => (l.name === oldName && l.department === oldDept) ? updatedLecturer : l));
-    // Update records if name or department changed
+    
+    const updatedLecturers = lecturersList.map(l => (l.name === oldName && l.department === oldDept) ? updatedLecturer : l);
+    let updatedRecords = [...records];
+    let updatedSchedules = [...schedules];
+
     if (oldName !== updatedLecturer.name || oldDept !== updatedLecturer.department) {
-      setRecords(prev => prev.map(r => (r.lecturerName === oldName && r.department === oldDept) ? { ...r, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : r));
-      setSchedules(prev => prev.map(s => (s.lecturerName === oldName && s.department === oldDept) ? { ...s, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : s));
+      updatedRecords = records.map(r => (r.lecturerName === oldName && r.department === oldDept) ? { ...r, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : r);
+      updatedSchedules = schedules.map(s => (s.lecturerName === oldName && s.department === oldDept) ? { ...s, lecturerName: updatedLecturer.name, department: updatedLecturer.department } : s);
     }
+
+    setLecturersList(updatedLecturers);
+    setRecords(updatedRecords);
+    setSchedules(updatedSchedules);
+    
+    setIsLocalUpdate({ records: true, schedules: true, lecturers: true });
+    await syncData(updatedRecords, updatedSchedules, updatedLecturers);
     showNotification('Maklumat pensyarah telah berjaya dikemaskini.');
   };
 
-  const handleAddLecturer = (lecturer: Lecturer) => {
+  const handleAddLecturer = async (lecturer: Lecturer) => {
     const isMonitor = user?.role === 'admin' || (user?.role === 'user' && user?.username.toLowerCase() !== 'pensyarah');
     if (!isMonitor) {
       alert('Hanya Admin atau Pemantau dibenarkan menambah pensyarah.');
       return;
     }
-    setLecturersList(prev => {
-      if (prev.some(l => l.name.toLowerCase() === lecturer.name.toLowerCase() && l.department === lecturer.department)) {
-        alert('Nama pensyarah dan jabatan ini sudah wujud dalam senarai.');
-        return prev;
-      }
-      return [...prev, lecturer];
-    });
+
+    if (lecturersList.some(l => l.name.toLowerCase() === lecturer.name.toLowerCase() && l.department === lecturer.department)) {
+      alert('Nama pensyarah dan jabatan ini sudah wujud dalam senarai.');
+      return;
+    }
+
+    const updatedLecturers = [...lecturersList, lecturer];
+    setLecturersList(updatedLecturers);
+    setIsLocalUpdate(prev => ({ ...prev, lecturers: true }));
+    await syncData(records, schedules, updatedLecturers);
     showNotification('Pensyarah baru telah berjaya ditambah.');
   };
 
@@ -546,33 +487,7 @@ const App: React.FC = () => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
     // Sync to server
-    try {
-      setIsSyncing(true);
-      await Promise.all([
-        fetch('/api/records', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedRecords)
-        }),
-        fetch('/api/lecturers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedLecturers)
-        }),
-        fetch('/api/schedules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedSchedules)
-        })
-      ]);
-      setIsLocalUpdate({ records: false, schedules: false, lecturers: false });
-      showNotification('Rekod telah berjaya dipadamkan dari sistem dan pelayan.');
-    } catch (error: any) {
-      console.error("Sync error during deletion:", error);
-      showNotification('Rekod dipadam secara lokal tetapi gagal dikemaskini di pelayan.', 'error');
-    } finally {
-      setIsSyncing(false);
-    }
+    await syncData(updatedRecords, updatedSchedules, updatedLecturers);
   };
 
   // Restricted user identification
