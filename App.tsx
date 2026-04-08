@@ -12,7 +12,9 @@ import {
   ExclamationCircleIcon,
   CheckBadgeIcon,
   ArrowRightOnRectangleIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  CloudArrowUpIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 interface ConfirmModalProps {
@@ -134,22 +136,17 @@ const App: React.FC = () => {
           } else if (isInitialLoad.current) {
             // Migration logic only on first load if server is empty
             const saved = localStorage.getItem('ipgkpt_records');
-            if (saved && JSON.parse(saved).length > 0) {
+            if (saved) {
               const localRecords = JSON.parse(saved);
-              setRecords(localRecords);
-              // Push to server immediately
-              fetch('/api/records', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(localRecords)
-              }).catch(console.error);
-            } else {
-              setRecords(INITIAL_RECORDS);
-              fetch('/api/records', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(INITIAL_RECORDS)
-              }).catch(console.error);
+              if (localRecords.length > 0) {
+                setRecords(localRecords);
+                // Push to server immediately
+                fetch('/api/records', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(localRecords)
+                }).catch(console.error);
+              }
             }
           }
         }
@@ -278,6 +275,8 @@ const App: React.FC = () => {
     updatedSchedules: MonitoringSchedule[], 
     updatedLecturers: Lecturer[]
   ) => {
+    console.log(`[Sync] Starting sync. Records: ${updatedRecords.length}, Schedules: ${updatedSchedules.length}, Lecturers: ${updatedLecturers.length}`);
+    
     // Update localStorage immediately
     localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
     localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
@@ -285,41 +284,44 @@ const App: React.FC = () => {
 
     try {
       setIsSyncing(true);
-      const [recRes, lecRes, schRes] = await Promise.all([
-        fetch('/api/records', {
+      
+      // Perform requests sequentially or with better error tracking
+      const syncRequest = async (path: string, data: any) => {
+        const res = await fetch(path, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedRecords)
-        }),
-        fetch('/api/lecturers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedLecturers)
-        }),
-        fetch('/api/schedules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedSchedules)
-        })
+          body: JSON.stringify(data)
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Server error on ${path}: ${res.status} ${errText}`);
+        }
+        return res.json();
+      };
+
+      await Promise.all([
+        syncRequest('/api/records', updatedRecords),
+        syncRequest('/api/lecturers', updatedLecturers),
+        syncRequest('/api/schedules', updatedSchedules)
       ]);
 
-      if (!recRes.ok || !lecRes.ok || !schRes.ok) {
-        throw new Error('Gagal menyimpan ke pelayan pusat.');
-      }
-
+      console.log("[Sync] Sync successful.");
       setIsLocalUpdate({ records: false, schedules: false, lecturers: false });
       setSyncError(null);
       setLastSync(new Date());
+      return true;
     } catch (error: any) {
-      console.error("Sync error:", error);
+      console.error("[Sync] Sync failed:", error);
       setSyncError(`Data disimpan secara lokal tetapi gagal dihantar ke pelayan: ${error.message}`);
       showNotification('Data disimpan secara lokal. Ia akan dihantar ke pelayan apabila talian pulih.', 'error');
+      return false;
     } finally {
       setIsSyncing(false);
     }
   };
 
   const handleAddRecord = async (record: EvaluationRecord) => {
+    console.log("[App] handleAddRecord called", record.id);
     // Set local update flag immediately
     setIsLocalUpdate(prev => ({ ...prev, records: true }));
     
@@ -354,11 +356,14 @@ const App: React.FC = () => {
     setSchedules(updatedSchedules);
 
     // Sync
-    await syncData(updatedRecords, updatedSchedules, updatedLecturers);
+    const success = await syncData(updatedRecords, updatedSchedules, updatedLecturers);
+    
+    if (success) {
+      showNotification('Rekod penilaian telah berjaya disimpan ke pelayan.');
+    }
     
     setEditingRecord(null);
     setView('dashboard');
-    showNotification('Rekod penilaian telah berjaya disimpan.');
   };
 
   const handleAddSchedule = async (schedule: MonitoringSchedule) => {
@@ -515,6 +520,22 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
+      {isSyncing && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[9999] flex items-center justify-center animate-in fade-in duration-300">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-4 max-w-xs w-full mx-4 border border-slate-100">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <CloudArrowUpIcon className="h-6 w-6 text-indigo-600 animate-bounce" />
+              </div>
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-slate-800">Menyimpan Data...</h3>
+              <p className="text-sm text-slate-500 mt-1">Sila tunggu sebentar sementara sistem menyelaraskan data anda ke pelayan.</p>
+            </div>
+          </div>
+        </div>
+      )}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
@@ -540,6 +561,17 @@ const App: React.FC = () => {
               <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-full border border-slate-100">
                 <UserCircleIcon className="h-4 w-4 text-slate-400" />
                 <span className="text-xs font-bold text-slate-600">{user.username}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${syncError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  {syncError ? 'Ralat Penyelarasan' : 'Sistem Dalam Talian'}
+                </span>
+                {lastSync && (
+                  <span className="text-[9px] text-slate-400">
+                    • Terakhir: {lastSync.toLocaleTimeString()}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -574,6 +606,23 @@ const App: React.FC = () => {
       </nav>
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        {/* Admin Debug Info */}
+        {user.role === 'admin' && syncError && (
+          <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-500">
+            <div className="flex items-center gap-2 text-rose-700 mb-2">
+              <ExclamationCircleIcon className="h-5 w-5" />
+              <h4 className="font-bold text-sm uppercase">Maklumat Ralat Penyelarasan (Admin Sahaja)</h4>
+            </div>
+            <p className="text-xs text-rose-600 font-mono break-all">{syncError}</p>
+            <button 
+              onClick={() => fetchData()} 
+              className="mt-3 text-[10px] font-bold bg-rose-600 text-white px-3 py-1.5 rounded-lg hover:bg-rose-700 transition-all flex items-center gap-1"
+            >
+              <ArrowPathIcon className="h-3 w-3" /> Cuba Lagi Sekarang
+            </button>
+          </div>
+        )}
+
         {view === 'dashboard' ? (
           <Dashboard 
             records={accessibleRecords} 

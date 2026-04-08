@@ -151,13 +151,20 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("[EvaluationForm] handleSubmit called");
     
     const missingCriteria = EVALUATION_CRITERIA.filter(c => !scores[c.id]);
     if (missingCriteria.length > 0) {
+      const firstMissing = missingCriteria[0];
       if (onNotification) {
-        onNotification(`Sila lengkapkan semua kriteria penilaian. (${missingCriteria.length} lagi)`, 'error');
-      } else {
-        alert('Sila lengkapkan semua kriteria penilaian.');
+        onNotification(`Sila lengkapkan semua kriteria penilaian. Sila semak kriteria ${firstMissing.id}`, 'error');
+      }
+      // Scroll to the first missing criterion
+      const element = document.getElementById(`criterion-${firstMissing.id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('ring-2', 'ring-red-500', 'ring-offset-2');
+        setTimeout(() => element.classList.remove('ring-2', 'ring-red-500', 'ring-offset-2'), 3000);
       }
       return;
     }
@@ -422,7 +429,7 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
                       <td className="px-6 py-3 border-l border-slate-100"></td>
                     </tr>
                     {criteria.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50 border-b border-slate-100">
+                      <tr key={item.id} id={`criterion-${item.id}`} className="hover:bg-slate-50 border-b border-slate-100 transition-all duration-300">
                         <td className="px-4 py-4 text-center text-sm font-medium text-slate-400 border-r border-slate-100"></td>
                         <td className="px-6 py-4 border-r border-slate-100 text-sm font-medium text-slate-700">{item.text}</td>
                         <td className="px-2 py-4 border-r border-slate-100">

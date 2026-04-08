@@ -12,16 +12,38 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 app.use(cors());
+app.use((req, res, next) => {
+  console.log(`[API] ${req.method} ${req.url}`);
+  next();
+});
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Helper for local file paths (only used in local dev)
 const DATA_DIR = path.join(process.cwd(), "data");
+console.log(`[API] Data directory: ${DATA_DIR}`);
 const RECORDS_FILE = path.join(DATA_DIR, "records.json");
 const SCHEDULES_FILE = path.join(DATA_DIR, "schedules.json");
 const LECTURERS_FILE = path.join(DATA_DIR, "lecturers.json");
 
 if (!fs.existsSync(DATA_DIR) && !process.env.VERCEL) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  try { 
+    fs.mkdirSync(DATA_DIR, { recursive: true }); 
+    console.log(`[API] Created data directory: ${DATA_DIR}`);
+  } catch (e: any) {
+    console.error(`[API] Failed to create data directory: ${e.message}`);
+  }
+}
+
+// Verify write permissions
+if (!process.env.VERCEL) {
+  try {
+    const testFile = path.join(DATA_DIR, ".write_test");
+    fs.writeFileSync(testFile, "ok");
+    console.log(`[API] Write test successful in ${DATA_DIR}`);
+  } catch (e: any) {
+    console.error(`[API] WRITE TEST FAILED in ${DATA_DIR}: ${e.message}`);
+  }
 }
 
 // Route Handlers
@@ -43,11 +65,23 @@ const getHealth = async (req: any, res: any) => {
       supabaseError = e.message;
     }
   }
+  let writeTest = "not_tested";
+  if (!process.env.VERCEL) {
+    try {
+      const testFile = path.join(DATA_DIR, ".write_test");
+      fs.writeFileSync(testFile, "ok");
+      writeTest = "ok";
+    } catch (e: any) {
+      writeTest = `failed: ${e.message}`;
+    }
+  }
+
   res.json({ 
     status: "ok", 
     persistence: supabase ? "supabase" : "local_file",
     supabase_status: supabaseStatus,
     supabase_error: supabaseError,
+    write_test: writeTest,
     is_vercel: !!process.env.VERCEL,
     url: req.url,
     path: req.path
@@ -84,14 +118,22 @@ const getRecords = async (req: any, res: any) => {
 
 const postRecords = async (req: any, res: any) => {
   const records = req.body;
-  console.log(`[API] Saving ${Array.isArray(records) ? records.length : 0} records...`);
+  const count = Array.isArray(records) ? records.length : 0;
+  console.log(`[API] POST /api/records - Saving ${count} records...`);
+  
+  if (!Array.isArray(records)) {
+    console.error("[API] Invalid records payload: not an array");
+    return res.status(400).json({ error: "Payload must be an array of records" });
+  }
+
   if (supabase) {
     try {
       const { error } = await supabase.from('epantau_storage').upsert({ id: 'records', content: records, updated_at: new Date() });
       if (error) {
         console.error("[API] Supabase error saving records:", error);
-        throw error;
+        return res.status(500).json({ error: error.message });
       }
+      console.log("[API] Records saved to Supabase.");
       res.json({ success: true });
     } catch (err: any) {
       console.error("[API] Exception saving records to Supabase:", err);
@@ -101,11 +143,11 @@ const postRecords = async (req: any, res: any) => {
     if (process.env.VERCEL) return res.status(503).json({ error: "Supabase required for Vercel persistence" });
     try {
       fs.writeFileSync(RECORDS_FILE, JSON.stringify(records, null, 2));
-      console.log("[API] Records saved to local file.");
+      console.log(`[API] Records saved to local file: ${RECORDS_FILE}`);
       res.json({ success: true });
     } catch (err: any) {
       console.error("[API] Error writing local records file:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: `Failed to write file: ${err.message}` });
     }
   }
 };
@@ -132,18 +174,35 @@ const getSchedules = async (req: any, res: any) => {
 
 const postSchedules = async (req: any, res: any) => {
   const schedules = req.body;
+  const count = Array.isArray(schedules) ? schedules.length : 0;
+  console.log(`[API] POST /api/schedules - Saving ${count} schedules...`);
+
+  if (!Array.isArray(schedules)) {
+    return res.status(400).json({ error: "Payload must be an array of schedules" });
+  }
+
   if (supabase) {
     try {
       const { error } = await supabase.from('epantau_storage').upsert({ id: 'schedules', content: schedules, updated_at: new Date() });
-      if (error) throw error;
+      if (error) {
+        console.error("[API] Supabase error saving schedules:", error);
+        return res.status(500).json({ error: error.message });
+      }
       res.json({ success: true });
     } catch (err: any) {
+      console.error("[API] Exception saving schedules to Supabase:", err);
       res.status(500).json({ error: err.message });
     }
   } else {
     if (process.env.VERCEL) return res.status(503).json({ error: "Supabase required for Vercel persistence" });
-    fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(schedules, null, 2));
-    res.json({ success: true });
+    try {
+      fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(schedules, null, 2));
+      console.log(`[API] Schedules saved to local file: ${SCHEDULES_FILE}`);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[API] Error writing local schedules file:", err);
+      res.status(500).json({ error: err.message });
+    }
   }
 };
 
@@ -169,18 +228,35 @@ const getLecturers = async (req: any, res: any) => {
 
 const postLecturers = async (req: any, res: any) => {
   const lecturers = req.body;
+  const count = Array.isArray(lecturers) ? lecturers.length : 0;
+  console.log(`[API] POST /api/lecturers - Saving ${count} lecturers...`);
+
+  if (!Array.isArray(lecturers)) {
+    return res.status(400).json({ error: "Payload must be an array of lecturers" });
+  }
+
   if (supabase) {
     try {
       const { error } = await supabase.from('epantau_storage').upsert({ id: 'lecturers', content: lecturers, updated_at: new Date() });
-      if (error) throw error;
+      if (error) {
+        console.error("[API] Supabase error saving lecturers:", error);
+        return res.status(500).json({ error: error.message });
+      }
       res.json({ success: true });
     } catch (err: any) {
+      console.error("[API] Exception saving lecturers to Supabase:", err);
       res.status(500).json({ error: err.message });
     }
   } else {
     if (process.env.VERCEL) return res.status(503).json({ error: "Supabase required for Vercel persistence" });
-    fs.writeFileSync(LECTURERS_FILE, JSON.stringify(lecturers, null, 2));
-    res.json({ success: true });
+    try {
+      fs.writeFileSync(LECTURERS_FILE, JSON.stringify(lecturers, null, 2));
+      console.log(`[API] Lecturers saved to local file: ${LECTURERS_FILE}`);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[API] Error writing local lecturers file:", err);
+      res.status(500).json({ error: err.message });
+    }
   }
 };
 
