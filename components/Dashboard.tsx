@@ -967,10 +967,13 @@ export const Dashboard: React.FC<Props> = ({
                          )}
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
                          {(isAdminView || canEdit) && (
-                           <>
-
-
-                           </>
+                           <button 
+                             onClick={() => onDeleteLecturer(item.name, item.department)} 
+                             className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors" 
+                             title="Padam Pensyarah"
+                           >
+                             <TrashIcon className="h-4 w-4" />
+                           </button>
                          )}
                       </td>
                     </tr>
