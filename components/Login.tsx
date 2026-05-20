@@ -3,16 +3,16 @@ import { ClipboardDocumentCheckIcon, LockClosedIcon, UserIcon, InformationCircle
 import { LECTURERS } from '../constants';
 
 interface Props {
-  onLogin: (user: { username: string; department: string; role: 'admin' | 'user' }, remember: boolean) => void;
+  onLogin: (user: { username: string; department: string; role: 'admin' | 'user'; isRestricted?: boolean }, remember: boolean) => void;
   onShowGuide: () => void;
 }
 
 // Map of system accounts (Admin & Dept Heads)
-const SYSTEM_ACCOUNTS: Record<string, { pass: string; dept: string; role: 'admin' | 'user' }> = {
+const SYSTEM_ACCOUNTS: Record<string, { pass: string; dept: string; role: 'admin' | 'user'; isRestricted?: boolean }> = {
   'admin': { pass: 'admin123', dept: 'SEMUA', role: 'admin' },
   'pengarah': { pass: 'ipgkpt', dept: 'SEMUA', role: 'admin' },
   'tp': { pass: 'tp123', dept: 'SEMUA', role: 'admin' },
-  'pensyarah': { pass: 'pensyarah', dept: 'SEMUA', role: 'user' }, // Universal account changed to pensyarah
+  'pensyarah': { pass: 'pensyarah', dept: 'SEMUA', role: 'user', isRestricted: true }, // Universal account changed to pensyarah
   'jmate': { pass: 'mate123', dept: 'Jabatan Matematik', role: 'user' },
   'jsains': { pass: 'sains123', dept: 'Jabatan Sains', role: 'user' },
   'jpi': { pass: 'jpi123', dept: 'Jabatan Pendidikan Islam', role: 'user' },
@@ -53,7 +53,8 @@ export const Login: React.FC<Props> = ({ onLogin, onShowGuide }) => {
         onLogin({
           username: username.trim(),
           department: sysAccount.dept,
-          role: sysAccount.role
+          role: sysAccount.role,
+          isRestricted: sysAccount.isRestricted
         }, remember);
         return;
       }
@@ -64,7 +65,8 @@ export const Login: React.FC<Props> = ({ onLogin, onShowGuide }) => {
          onLogin({
             username: lecturer.name,
             department: lecturer.department,
-            role: 'user'
+            role: 'user',
+            isRestricted: true
           }, remember);
           return;
       }

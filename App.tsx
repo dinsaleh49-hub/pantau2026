@@ -67,7 +67,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
 };
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<{ username: string; department: string; role: 'admin' | 'user' } | null>(() => {
+  const [user, setUser] = useState<{ username: string; department: string; role: 'admin' | 'user'; isRestricted?: boolean } | null>(() => {
     const saved = localStorage.getItem('ipgkpt_user');
     return saved ? JSON.parse(saved) : null;
   });
@@ -130,9 +130,9 @@ const App: React.FC = () => {
       if (recordsRes.ok) {
         const recordsData = await recordsRes.json();
         if (Array.isArray(recordsData)) {
-          // Only update if server has data OR if it's the very first load and server is empty
           if (recordsData.length > 0) {
             setRecords(recordsData);
+            localStorage.setItem('ipgkpt_records', JSON.stringify(recordsData));
           } else if (isInitialLoad.current) {
             // Migration logic only on first load if server is empty
             const saved = localStorage.getItem('ipgkpt_records');
@@ -148,6 +148,9 @@ const App: React.FC = () => {
                 }).catch(console.error);
               }
             }
+          } else {
+            setRecords([]);
+            localStorage.setItem('ipgkpt_records', JSON.stringify([]));
           }
         }
       }
@@ -157,6 +160,7 @@ const App: React.FC = () => {
         if (Array.isArray(schedulesData)) {
           if (schedulesData.length > 0) {
             setSchedules(schedulesData);
+            localStorage.setItem('ipgkpt_schedules', JSON.stringify(schedulesData));
           } else if (isInitialLoad.current) {
             const saved = localStorage.getItem('ipgkpt_schedules');
             if (saved && JSON.parse(saved).length > 0) {
@@ -168,6 +172,9 @@ const App: React.FC = () => {
                 body: JSON.stringify(localSchedules)
               }).catch(console.error);
             }
+          } else {
+            setSchedules([]);
+            localStorage.setItem('ipgkpt_schedules', JSON.stringify([]));
           }
         }
       }
@@ -177,6 +184,7 @@ const App: React.FC = () => {
         if (Array.isArray(lecturersData)) {
           if (lecturersData.length > 0) {
             setLecturersList(lecturersData);
+            localStorage.setItem('ipgkpt_lecturers', JSON.stringify(lecturersData));
           } else if (isInitialLoad.current) {
             const saved = localStorage.getItem('ipgkpt_lecturers');
             if (saved && JSON.parse(saved).length > 0) {
@@ -188,6 +196,9 @@ const App: React.FC = () => {
                 body: JSON.stringify(localLecturers)
               }).catch(console.error);
             }
+          } else {
+            setLecturersList([]);
+            localStorage.setItem('ipgkpt_lecturers', JSON.stringify([]));
           }
         }
       }
@@ -496,7 +507,7 @@ const App: React.FC = () => {
   };
 
   // Restricted user identification
-  const isRestrictedUser = user?.username.toLowerCase() === 'pensyarah' && user?.role === 'user';
+  const isRestrictedUser = !!user?.isRestricted || (user?.username.toLowerCase() === 'pensyarah' && user?.role === 'user');
 
   // Improved filtering to handle universal 'SEMUA' access
   const accessibleRecords = (user?.role === 'admin' || (user?.department === 'SEMUA' && !isRestrictedUser))
@@ -583,14 +594,16 @@ const App: React.FC = () => {
                   Dashboard
                 </button>
                 
-                <button
-                  onClick={() => { setEditingRecord(null); setView('form'); }}
-                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                    view === 'form' && !editingRecord ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  + Borang
-                </button>
+                {!isRestrictedUser && (
+                  <button
+                    onClick={() => { setEditingRecord(null); setView('form'); }}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                      view === 'form' && !editingRecord ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    + Borang
+                  </button>
+                )}
 
                 <button
                   onClick={handleLogout}
@@ -632,6 +645,7 @@ const App: React.FC = () => {
             userRole={user.role}
             username={user.username}
             userDept={user.department}
+            isRestrictedUser={isRestrictedUser}
             onDeleteRecord={openDeleteRecordConfirm} 
             onDeleteLecturer={openDeleteLecturerConfirm}
             onDeleteSchedule={openDeleteScheduleConfirm}
