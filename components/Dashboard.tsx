@@ -96,7 +96,7 @@ export const Dashboard: React.FC<Props> = ({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusSearchTerm, setStatusSearchTerm] = useState('');
-  const [analysisType, setAnalysisType] = useState<'lecturer' | 'department'>('lecturer');
+  const [analysisType, setAnalysisType] = useState<'lecturer' | 'department'>('department');
   const [deptMetric, setDeptMetric] = useState<'score' | 'count'>('score');
   
   const [mainTab, setMainTab] = useState<'analytics' | 'status' | 'schedule' | 'summary'>(isRestricted ? 'schedule' : 'analytics');
@@ -684,8 +684,8 @@ export const Dashboard: React.FC<Props> = ({
                   {isAdminView ? 'Analisis Prestasi Seluruh Kampus' : 'Carta Prestasi Jabatan'}
                 </h3>
                 <div className="inline-flex p-1 bg-slate-100 rounded-xl">
-                  <button onClick={() => setAnalysisType('lecturer')} className={`px-3 py-1.5 text-xs font-bold rounded-lg ${analysisType === 'lecturer' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Staf</button>
                   <button onClick={() => setAnalysisType('department')} className={`px-3 py-1.5 text-xs font-bold rounded-lg ${analysisType === 'department' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Jabatan</button>
+                  <button onClick={() => setAnalysisType('lecturer')} className={`px-3 py-1.5 text-xs font-bold rounded-lg ${analysisType === 'lecturer' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Staf</button>
                 </div>
               </div>
               <div className="h-[380px] w-full">
