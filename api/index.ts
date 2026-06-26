@@ -3,6 +3,7 @@ import cors from "cors";
 import fs from "fs";
 import path from "path";
 import { createClient } from '@supabase/supabase-js';
+import { GoogleGenAI } from "@google/genai";
 
 const app = express();
 
@@ -260,9 +261,49 @@ const postLecturers = async (req: any, res: any) => {
   }
 };
 
+const postGeminiSummary = async (req: any, res: any) => {
+  const { prompt } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ error: "Prompt is required" });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("[API] GEMINI_API_KEY is not defined in environment variables.");
+    return res.status(500).json({ 
+      error: "Sila tetapkan GEMINI_API_KEY di bahagian Settings > Secrets untuk membolehkan analisis AI." 
+    });
+  }
+
+  try {
+    const ai = new GoogleGenAI({
+      apiKey: apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+
+    const text = response.text || "Rumusan gagal dijana oleh Gemini.";
+    res.json({ text });
+  } catch (err: any) {
+    console.error("[API] Error calling Gemini API:", err);
+    res.status(500).json({ error: `Ralat menjana rumusan AI: ${err.message || err}` });
+  }
+};
+
 // Register routes with and without /api prefix
 app.get("/api/health", getHealth);
 app.get("/health", getHealth);
+
+app.post("/api/gemini/summary", postGeminiSummary);
+app.post("/gemini/summary", postGeminiSummary);
 
 app.get("/api/records", getRecords);
 app.get("/records", getRecords);

@@ -1,5 +1,8 @@
 {
-  "name": "ePantau v2.0 IPGKPT",
+  "name": "PINTAR-Dash",
   "description": "Sistem Pengurusan & Pemantauan Pelaksanaan Kurikulum IPGKPT (LAM-PT-03-04). Digitalized monitoring with AI Analysis and PDF Reporting.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

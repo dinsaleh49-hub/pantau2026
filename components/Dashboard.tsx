@@ -34,7 +34,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { generatePDF, generateSummaryPDF, generateFullDepartmentPDF } from '../services/pdfService';
 import { uploadToGoogleDrive } from '../services/googleDriveService';
-import { GoogleGenAI } from "@google/genai";
 import { EVALUATION_CRITERIA, DEPARTMENTS, LECTURERS } from '../constants';
 import { UserGuideModal } from './UserGuideModal';
 
@@ -419,8 +418,6 @@ export const Dashboard: React.FC<Props> = ({
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || "" });
-      
       const dataString = recordsToAnalyze.map((r, idx) => {
         const scores = Object.entries(r.scores).map(([id, score]) => {
           const criterion = EVALUATION_CRITERIA.find(c => c.id === id);
@@ -441,14 +438,24 @@ export const Dashboard: React.FC<Props> = ({
       DATA PENILAIAN UNTUK ${lecturerName.toUpperCase()}:
       ${dataString}`;
 
-      const response = await ai.models.generateContent({ 
-        model: 'gemini-3-flash-preview', 
-        contents: [{ parts: [{ text: prompt }] }] 
+      const res = await fetch("/api/gemini/summary", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt }),
       });
-      setAiSummary(response.text || "Rumusan gagal dijana.");
-    } catch (error) {
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error! status: ${res.status}`);
+      }
+
+      const result = await res.json();
+      setAiSummary(result.text || "Rumusan gagal dijana.");
+    } catch (error: any) {
       console.error(error);
-      setAiSummary("Ralat menjana rumusan AI. Sila pastikan sambungan internet stabil.");
+      setAiSummary(error.message || "Ralat menjana rumusan AI. Sila pastikan GEMINI_API_KEY telah dikonfigurasikan.");
     } finally {
       setIsSummarizing(false);
     }
