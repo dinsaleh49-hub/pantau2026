@@ -83,7 +83,7 @@ export const Login: React.FC<Props> = ({ onLogin, onShowGuide }) => {
           <div className="mx-auto h-16 w-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6">
             <ClipboardDocumentCheckIcon className="h-10 w-10 text-white" />
           </div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">ePantau v2.0</h2>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">PINTAR-Dash</h2>
           <p className="mt-2 text-sm text-slate-500 font-bold uppercase tracking-widest leading-tight">
             SISTEM PEMANTAUAN PELAKSANAAN KURIKULUM
           </p>

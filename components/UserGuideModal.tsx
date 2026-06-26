@@ -28,7 +28,7 @@ export const UserGuideModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <InformationCircleIcon className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="text-xl font-black text-slate-800 tracking-tight">Panduan Pengguna ePantau v2.0</h3>
+              <h3 className="text-xl font-black text-slate-800 tracking-tight">Panduan Pengguna PINTAR-Dash</h3>
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Manual Pengoperasian Sistem</p>
             </div>
           </div>
@@ -42,7 +42,7 @@ export const UserGuideModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <CheckBadgeIcon className="h-5 w-5" /> 1. Pengenalan
             </h4>
             <p className="text-sm text-slate-600 leading-relaxed">
-              ePantau v2.0 adalah sistem digital untuk IPGKPT bagi menguruskan pemantauan kurikulum (LAM-PT-03-04). Sistem ini menyokong analisis AI, penjanaan laporan PDF, dan integrasi Google Drive.
+              PINTAR-Dash adalah sistem digital untuk IPGKPT bagi menguruskan pemantauan kurikulum (LAM-PT-03-04). Sistem ini menyokong analisis AI, penjanaan laporan PDF, dan integrasi Google Drive.
             </p>
           </section>
 

@@ -561,7 +561,7 @@ export const Dashboard: React.FC<Props> = ({
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">PINTAR-Dash</h2>
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Status ePantau v2.0</p>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Status PINTAR-Dash</p>
             {lastSync && (
               <p className="text-[9px] text-slate-400 font-medium italic">
                 • Dikemaskini: {lastSync.toLocaleTimeString()}

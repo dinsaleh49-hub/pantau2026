@@ -561,7 +561,7 @@ const App: React.FC = () => {
                 )}
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-900 leading-tight">ePantau v2.0</h1>
+                <h1 className="text-xl font-bold text-slate-900 leading-tight">PINTAR-Dash</h1>
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">
                   {isRestrictedUser ? 'Akses Terhad' : user.role === 'admin' ? 'Superuser' : user.department}
                 </p>
