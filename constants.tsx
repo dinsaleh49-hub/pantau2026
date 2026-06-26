@@ -19,7 +19,6 @@ export const DEPARTMENTS = [
   'Jabatan Pendidikan Teknik dan Vokasional',
   'Jabatan Pengajian Melayu',
   'Jabatan Pendidikan Jasmani dan Kokurikulum',
-  'Jabatan Pendidikan Jasmani dan Kesihatan',
 ];
 
 // Added department property to each lecturer to resolve type mismatch errors in App.tsx (Lines 167 and 180)
