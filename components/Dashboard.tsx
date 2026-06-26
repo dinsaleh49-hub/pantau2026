@@ -559,7 +559,7 @@ export const Dashboard: React.FC<Props> = ({
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Dashboard Pemantauan</h2>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">PINTAR-Dash</h2>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Status ePantau v2.0</p>
             {lastSync && (
