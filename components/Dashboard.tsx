@@ -1,8 +1,28 @@
 import React, { useMemo, useState } from 'react';
 import { EvaluationRecord, MonitoringSchedule } from '../types';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie, Legend
 } from 'recharts';
+
+const PIE_COLORS = [
+  '#4f46e5', // indigo-600
+  '#06b6d4', // cyan-500
+  '#10b981', // emerald-500
+  '#f59e0b', // amber-500
+  '#ec4899', // pink-500
+  '#8b5cf6', // violet-500
+  '#f43f5e', // rose-500
+  '#14b8a6', // teal-500
+  '#3b82f6', // blue-500
+  '#eab308', // yellow-500
+  '#a855f7', // purple-500
+  '#f97316', // orange-500
+  '#0284c7', // sky-600
+  '#16a34a', // green-600
+  '#db2777', // pink-600
+  '#ea580c', // orange-600
+];
 import { 
   MagnifyingGlassIcon, 
   PrinterIcon,
@@ -697,17 +717,38 @@ export const Dashboard: React.FC<Props> = ({
               </div>
               <div className="h-[380px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={activeChartData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
-                    <XAxis type="number" domain={[0, 5]} hide />
-                    <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 9, fontWeight: 600, fill: '#64748b' }} />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
+                  <PieChart>
+                    <Pie
+                      data={activeChartData}
+                      cx="50%"
+                      cy="45%"
+                      innerRadius={65}
+                      outerRadius={105}
+                      paddingAngle={3}
+                      dataKey="value"
+                      label={({ name, percent }) => {
+                        const cleanName = name.includes(' (') ? name.split(' (')[0] : name;
+                        return `${cleanName.length > 15 ? cleanName.substring(0, 12) + '...' : cleanName}: ${(percent * 100).toFixed(0)}%`;
+                      }}
+                      labelLine={true}
+                    >
                       {activeChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.name.includes('(KJ)') ? '#f43f5e' : '#4f46e5'} />
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
-                    </Bar>
-                  </BarChart>
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      itemStyle={{ color: '#1e293b', fontSize: '11px', fontWeight: 'bold' }}
+                      formatter={(value, name) => [`${value}`, `${name}`]} 
+                    />
+                    <Legend 
+                      iconSize={8}
+                      layout="horizontal"
+                      verticalAlign="bottom"
+                      align="center"
+                      wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b', paddingTop: '10px' }}
+                    />
+                  </PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
