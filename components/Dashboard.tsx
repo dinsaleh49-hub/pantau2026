@@ -726,10 +726,21 @@ export const Dashboard: React.FC<Props> = ({
                       outerRadius={105}
                       paddingAngle={3}
                       dataKey="value"
-                      label={({ name, value }) => {
+                      label={({ x, y, textAnchor, name, value }) => {
                         const cleanName = name.includes(' (') ? name.split(' (')[0] : name;
                         const formattedValue = typeof value === 'number' ? (value % 1 === 0 ? value : value.toFixed(2)) : value;
-                        return `${cleanName.length > 15 ? cleanName.substring(0, 12) + '...' : cleanName}: ${formattedValue}`;
+                        return (
+                          <text
+                            x={x}
+                            y={y}
+                            textAnchor={textAnchor}
+                            dominantBaseline="central"
+                            className="text-[8px] font-bold fill-slate-600"
+                            style={{ fontSize: '8px', fontWeight: 'bold' }}
+                          >
+                            {`${cleanName}: ${formattedValue}`}
+                          </text>
+                        );
                       }}
                       labelLine={true}
                     >
