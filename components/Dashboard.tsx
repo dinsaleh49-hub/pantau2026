@@ -726,9 +726,10 @@ export const Dashboard: React.FC<Props> = ({
                       outerRadius={105}
                       paddingAngle={3}
                       dataKey="value"
-                      label={({ name, percent }) => {
+                      label={({ name, value }) => {
                         const cleanName = name.includes(' (') ? name.split(' (')[0] : name;
-                        return `${cleanName.length > 15 ? cleanName.substring(0, 12) + '...' : cleanName}: ${(percent * 100).toFixed(0)}%`;
+                        const formattedValue = typeof value === 'number' ? (value % 1 === 0 ? value : value.toFixed(2)) : value;
+                        return `${cleanName.length > 15 ? cleanName.substring(0, 12) + '...' : cleanName}: ${formattedValue}`;
                       }}
                       labelLine={true}
                     >
