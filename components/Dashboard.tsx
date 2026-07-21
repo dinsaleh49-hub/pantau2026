@@ -715,78 +715,82 @@ export const Dashboard: React.FC<Props> = ({
                   <button onClick={() => setAnalysisType('lecturer')} className={`px-3 py-1.5 text-xs font-bold rounded-lg ${analysisType === 'lecturer' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Staf</button>
                 </div>
               </div>
-              <div className={`h-[380px] w-full ${analysisType === 'lecturer' ? 'grid grid-cols-1 md:grid-cols-12 gap-6' : ''}`}>
-                <div className={analysisType === 'lecturer' ? 'md:col-span-7 h-full' : 'h-full w-full'}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={activeChartData}
-                        cx="50%"
-                        cy="45%"
-                        innerRadius={65}
-                        outerRadius={105}
-                        paddingAngle={3}
-                        dataKey="value"
-                        label={({ x, y, textAnchor, name, value }) => {
-                          const cleanName = name.includes(' (') ? name.split(' (')[0] : name;
-                          const formattedValue = typeof value === 'number' ? (value % 1 === 0 ? value : value.toFixed(2)) : value;
-                          return (
-                            <text
-                              x={x}
-                              y={y}
-                              textAnchor={textAnchor}
-                              dominantBaseline="central"
-                              className="text-[8px] font-bold fill-slate-600"
-                              style={{ fontSize: '8px', fontWeight: 'bold' }}
-                            >
-                              {`${cleanName}: ${formattedValue}`}
-                            </text>
-                          );
-                        }}
-                        labelLine={true}
-                      >
-                        {activeChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        itemStyle={{ color: '#1e293b', fontSize: '11px', fontWeight: 'bold' }}
-                        formatter={(value, name) => [`${value}`, `${name}`]} 
-                      />
-                      <Legend 
-                        iconSize={8}
-                        layout="horizontal"
-                        verticalAlign="bottom"
-                        align="center"
-                        wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b', paddingTop: '10px' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
+              <div className="h-[380px] w-full">
+                {analysisType === 'department' && (
+                  <div className="h-full w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={activeChartData}
+                          cx="50%"
+                          cy="45%"
+                          innerRadius={65}
+                          outerRadius={105}
+                          paddingAngle={3}
+                          dataKey="value"
+                          label={({ x, y, textAnchor, name, value }) => {
+                            const cleanName = name.includes(' (') ? name.split(' (')[0] : name;
+                            const formattedValue = typeof value === 'number' ? (value % 1 === 0 ? value : value.toFixed(2)) : value;
+                            return (
+                              <text
+                                x={x}
+                                y={y}
+                                textAnchor={textAnchor}
+                                dominantBaseline="central"
+                                className="text-[8px] font-bold fill-slate-600"
+                                style={{ fontSize: '8px', fontWeight: 'bold' }}
+                              >
+                                {`${cleanName}: ${formattedValue}`}
+                              </text>
+                            );
+                          }}
+                          labelLine={true}
+                        >
+                          {activeChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          itemStyle={{ color: '#1e293b', fontSize: '11px', fontWeight: 'bold' }}
+                          formatter={(value, name) => [`${value}`, `${name}`]} 
+                        />
+                        <Legend 
+                          iconSize={8}
+                          layout="horizontal"
+                          verticalAlign="bottom"
+                          align="center"
+                          wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b', paddingTop: '10px' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
 
                 {analysisType === 'lecturer' && (
-                  <div className="md:col-span-5 h-full flex flex-col border border-slate-100 rounded-2xl bg-slate-50/50 p-4 overflow-hidden">
+                  <div className="w-full h-full flex flex-col border border-slate-100 rounded-2xl bg-slate-50/50 p-4 overflow-hidden">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Senarai Prestasi Pensyarah & Min</p>
-                    <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
-                      {lecturerStats.map((item, index) => (
-                        <div key={item.name} className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-sm transition-all">
-                          <div className="flex items-center gap-2.5 overflow-hidden mr-2">
-                            <span className="text-[10px] font-bold text-slate-400 w-4 text-center shrink-0">{index + 1}</span>
-                            <div className="overflow-hidden">
-                              <p className="text-[11px] font-black text-slate-800 leading-snug whitespace-normal break-words" title={item.name}>
-                                {item.name}
-                              </p>
-                              <p className="text-[8px] font-bold text-indigo-500 truncate mt-0.5">{item.department}</p>
+                    <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {lecturerStats.map((item, index) => (
+                          <div key={item.name} className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-sm transition-all">
+                            <div className="flex items-center gap-2.5 overflow-hidden mr-2">
+                              <span className="text-[10px] font-bold text-slate-400 w-4 text-center shrink-0">{index + 1}</span>
+                              <div className="overflow-hidden">
+                                <p className="text-[11px] font-black text-slate-800 leading-snug whitespace-normal break-words" title={item.name}>
+                                  {item.name}
+                                </p>
+                                <p className="text-[8px] font-bold text-indigo-500 truncate mt-0.5">{item.department}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-700">
+                                {item.value.toFixed(2)}
+                              </span>
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-700">
-                              {item.value.toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
