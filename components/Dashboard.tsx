@@ -664,7 +664,7 @@ export const Dashboard: React.FC<Props> = ({
 
       {mainTab === 'analytics' && !isRestricted && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
               <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl"><PresentationChartBarIcon className="h-6 w-6"/></div>
               <div><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Purata Skor Keseluruhan</p><p className="text-xl font-black text-slate-900">{overallMean}</p></div>
@@ -695,6 +695,25 @@ export const Dashboard: React.FC<Props> = ({
               {unmonitoredLecturersOverall.length > 0 && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
                   <p className="text-[10px] font-black text-rose-600 uppercase mb-2">Belum Dipantau ({unmonitoredLecturersOverall.length})</p>
+                  <div className="space-y-1 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                    {unmonitoredLecturersOverall.map(l => (
+                      <div key={l.name} className="text-[10px] font-bold text-slate-600 border-b border-slate-50 pb-1">
+                        {l.name} <span className="text-[8px] text-slate-400 font-medium">({l.department})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 relative group">
+              <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl"><ExclamationCircleIcon className="h-6 w-6"/></div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Belum Dipantau</p>
+                <p className="text-xl font-black text-slate-900">{unmonitoredLecturersOverall.length}</p>
+              </div>
+              {unmonitoredLecturersOverall.length > 0 && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+                  <p className="text-[10px] font-black text-orange-600 uppercase mb-2">Senarai Belum Dipantau ({unmonitoredLecturersOverall.length})</p>
                   <div className="space-y-1 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                     {unmonitoredLecturersOverall.map(l => (
                       <div key={l.name} className="text-[10px] font-bold text-slate-600 border-b border-slate-50 pb-1">
