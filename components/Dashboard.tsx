@@ -367,7 +367,7 @@ export const Dashboard: React.FC<Props> = ({
       const pdfBlob = generatePDF(record, 'blob');
       const success = await uploadToGoogleDrive(record, pdfBlob);
       if (success) {
-        alert(`Berjaya Disimpan ke Google Drive Admin!\n\nFolder: iPantau_v2_Archive\nSub-folder: ${record.department}\nFail: LAM-PT-03-04_${record.lecturerName.replace(/\s+/g, '_')}_${record.date}.pdf\n\nKlik OK untuk membuka folder digital.`);
+        alert(`Berjaya Disimpan ke Google Drive Admin!\n\nFolder Utama: iPantau_v2_Archive\nSub-folder Jabatan: ${record.department}\nFail: [${record.department}]_LAM-PT-03-04_${record.lecturerName.replace(/\s+/g, '_')}_${record.date}.pdf\n\nKlik OK untuk membuka folder digital.`);
         window.open(DRIVE_FOLDER_URL, "_blank");
       }
     } catch (error) {
@@ -381,15 +381,23 @@ export const Dashboard: React.FC<Props> = ({
   const handleBulkExportToDrive = async (deptName: string) => {
     const deptRecords = records.filter(r => r.department === deptName);
     if (deptRecords.length === 0) {
-      alert(`Tiada rekok lengkap ditemui untuk ${deptName}.`);
+      alert(`Tiada rekod lengkap ditemui untuk ${deptName}.`);
       return;
     }
     setIsBulkSaving(deptName);
-    setTimeout(() => {
-      setIsBulkSaving(null);
-      alert(`Berjaya Mengeksport ${deptRecords.length} rekod pensyarah ${deptName}!\n\nSemua fail PDF telah disusun ke dalam sub-folder jabatan dalam Google Drive Admin.\n\nKlik OK untuk menyemak arkib.`);
+    try {
+      for (const record of deptRecords) {
+        const pdfBlob = generatePDF(record, 'blob');
+        await uploadToGoogleDrive(record, pdfBlob);
+      }
+      alert(`Berjaya Mengeksport ${deptRecords.length} rekod PDF pensyarah ${deptName}!\n\nSemua fail PDF telah disimpan ke dalam sub-folder [${deptName}] dalam Google Drive Admin.\n\nKlik OK untuk menyemak arkib.`);
       window.open(DRIVE_FOLDER_URL, "_blank");
-    }, 3000);
+    } catch (error) {
+      console.error(error);
+      alert('Ralat semasa mengeksport fail PDF ke Google Drive.');
+    } finally {
+      setIsBulkSaving(null);
+    }
   };
 
   const exportToCSV = () => {

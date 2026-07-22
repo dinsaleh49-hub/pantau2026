@@ -10,7 +10,7 @@ export const uploadToGoogleDrive = async (record: EvaluationRecord, pdfBlob: Blo
   const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
   const apiKey = import.meta.env.VITE_APPS_SCRIPT_API_KEY;
 
-  console.log(`Memulakan muat naik fail untuk: ${record.lecturerName}`);
+  console.log(`Memulakan muat naik fail untuk: ${record.lecturerName} (Folder Jabatan: ${record.department})`);
   
   if (appsScriptUrl) {
     try {
@@ -25,6 +25,9 @@ export const uploadToGoogleDrive = async (record: EvaluationRecord, pdfBlob: Blo
       reader.readAsDataURL(pdfBlob);
       const base64Data = await base64Promise;
 
+      const safeDept = record.department.replace(/[\/\s]+/g, '_');
+      const safeName = record.lecturerName.replace(/[\/\s]+/g, '_');
+
       const response = await fetch(appsScriptUrl, {
         method: 'POST',
         mode: 'no-cors', // Apps Script Web App biasanya memerlukan no-cors jika tiada preflight
@@ -33,7 +36,9 @@ export const uploadToGoogleDrive = async (record: EvaluationRecord, pdfBlob: Blo
         },
         body: JSON.stringify({
           apiKey: apiKey,
-          filename: `LAM-PT-03-04_${record.lecturerName.replace(/\s+/g, '_')}_${record.date}.pdf`,
+          filename: `LAM-PT-03-04_${safeName}_${record.date}.pdf`,
+          folderName: record.department, // Nama subfolder ikut jabatan
+          departmentFolder: record.department,
           data: base64Data,
           lecturer: record.lecturerName,
           department: record.department,
@@ -41,7 +46,7 @@ export const uploadToGoogleDrive = async (record: EvaluationRecord, pdfBlob: Blo
         })
       });
 
-      console.log('Respons daripada Apps Script dihantar (no-cors mode)');
+      console.log(`Respons daripada Apps Script dihantar ke folder: ${record.department}`);
       return true;
     } catch (error) {
       console.error('Ralat integrasi Apps Script:', error);
@@ -50,8 +55,11 @@ export const uploadToGoogleDrive = async (record: EvaluationRecord, pdfBlob: Blo
   }
 
   // Simulasi metadata fail jika tiada URL Apps Script
+  const safeDept = record.department.replace(/[\/\s]+/g, '_');
+  const safeName = record.lecturerName.replace(/[\/\s]+/g, '_');
   const metadata = {
-    name: `LAM-PT-03-04_${record.lecturerName.replace(/\s+/g, '_')}_${record.date}.pdf`,
+    name: `[${safeDept}]_LAM-PT-03-04_${safeName}_${record.date}.pdf`,
+    folderName: record.department,
     mimeType: 'application/pdf',
     parents: ['1I5-K1Yv3SnFMBzUQtQnPzR82AeHWJqNw'] // ID Folder Admin
   };

@@ -252,8 +252,9 @@ export const generatePDF = (record: EvaluationRecord, action: 'save' | 'view' | 
   } else if (action === 'blob') {
     return doc.output('blob');
   } else {
-    const safeName = record.lecturerName.replace(/\s+/g, '_');
-    doc.save(`LAM-PT-03-04_${safeName}_${record.date}.pdf`);
+    const safeDept = record.department.replace(/[\/\s]+/g, '_');
+    const safeName = record.lecturerName.replace(/[\/\s]+/g, '_');
+    doc.save(`[${safeDept}]_LAM-PT-03-04_${safeName}_${record.date}.pdf`);
   }
 };
 
