@@ -671,7 +671,7 @@ export const Dashboard: React.FC<Props> = ({
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
               <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl"><AcademicCapIcon className="h-6 w-6"/></div>
-              <div><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Penilaian</p><p className="text-xl font-black text-slate-900">{records.length}</p></div>
+              <div><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Telah Dipantau</p><p className="text-xl font-black text-slate-900">{records.length}</p></div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
               <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl"><CheckBadgeIcon className="h-6 w-6"/></div>
@@ -880,7 +880,7 @@ export const Dashboard: React.FC<Props> = ({
 
           <div className="bg-white rounded-2xl border border-slate-200 flex flex-col shadow-sm overflow-hidden">
              <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="text-lg font-bold text-slate-800">Senarai Penuh Rekod Penilaian</h3>
+                <h3 className="text-lg font-bold text-slate-800">Senarai Penuh Rekod Telah Dipantau</h3>
                 <div className="flex items-center gap-3">
                   {(userRole === 'admin' || activeDepartments.length > 1) && (
                     <div className="relative">
@@ -903,7 +903,7 @@ export const Dashboard: React.FC<Props> = ({
              </div>
              <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead><tr className="bg-slate-50/50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px] tracking-widest"><th className="px-6 py-3">Maklumat Penilaian</th><th className="px-6 py-3 text-right">Tindakan</th></tr></thead>
+                  <thead><tr className="bg-slate-50/50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px] tracking-widest"><th className="px-6 py-3">Maklumat Telah Dipantau</th><th className="px-6 py-3 text-right">Tindakan</th></tr></thead>
                   <tbody className="divide-y divide-slate-50">
                     {filteredRecords.map(record => {
                       const scores = Object.values(record.scores) as number[];
