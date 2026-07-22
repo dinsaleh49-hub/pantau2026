@@ -574,6 +574,13 @@ export const Dashboard: React.FC<Props> = ({
     return (lecturerStats.reduce((a, b) => a + b.value, 0) / lecturerStats.length).toFixed(2);
   }, [lecturerStats]);
 
+  const overallMonitoredPercentage = useMemo(() => {
+    if (allLecturers.length === 0) return "0%";
+    const monitoredCount = allLecturers.length - unmonitoredLecturersOverall.length;
+    const pct = (monitoredCount / allLecturers.length) * 100;
+    return (pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)) + "%";
+  }, [allLecturers, unmonitoredLecturersOverall]);
+
   const activeChartData = useMemo(() => {
     if (analysisType === 'lecturer') {
       return lecturerStats.map(d => ({ name: d.displayName, value: d.value }));
@@ -668,7 +675,7 @@ export const Dashboard: React.FC<Props> = ({
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
               <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl"><CheckBadgeIcon className="h-6 w-6"/></div>
-              <div><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Pemantauan KJ</p><p className="text-xl font-black text-slate-900">{kjMonitoringStats.monitored}/{kjMonitoringStats.total}</p></div>
+              <div><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Peratus Keseluruhan Dipantau</p><p className="text-xl font-black text-slate-900">{overallMonitoredPercentage}</p></div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 relative group">
               <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl"><UsersIcon className="h-6 w-6"/></div>
