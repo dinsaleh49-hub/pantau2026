@@ -81,7 +81,7 @@ export const UserGuideModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </li>
               <li className="flex gap-3">
                 <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">3</div>
-                <p className="text-sm text-slate-600">Pastikan <strong>kedua-dua pihak</strong> menurunkan tandatangan digital.</p>
+                <p className="text-sm text-slate-600">Pastikan <strong>kedua-dua pihak</strong> (Pensyarah & Pemantau) menurunkan tandatangan digital. Sistem menyimpan kedua-dua tandatangan secara kekal ke dalam rekod serta profil untuk diguna semula secara pantas.</p>
               </li>
               <li className="flex gap-3">
                 <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">4</div>

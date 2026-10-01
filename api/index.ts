@@ -26,6 +26,7 @@ console.log(`[API] Data directory: ${DATA_DIR}`);
 const RECORDS_FILE = path.join(DATA_DIR, "records.json");
 const SCHEDULES_FILE = path.join(DATA_DIR, "schedules.json");
 const LECTURERS_FILE = path.join(DATA_DIR, "lecturers.json");
+const SIGNATURES_FILE = path.join(DATA_DIR, "signatures.json");
 
 if (!fs.existsSync(DATA_DIR) && !process.env.VERCEL) {
   try { 
@@ -261,6 +262,60 @@ const postLecturers = async (req: any, res: any) => {
   }
 };
 
+const getSignatures = async (req: any, res: any) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('epantau_storage').select('content').eq('id', 'signatures').maybeSingle();
+      if (error) throw error;
+      return res.json(data?.content || {});
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  } else {
+    try {
+      if (fs.existsSync(SIGNATURES_FILE)) {
+        return res.json(JSON.parse(fs.readFileSync(SIGNATURES_FILE, "utf-8")));
+      }
+      res.json({});
+    } catch (e) { res.json({}); }
+  }
+};
+
+const postSignatures = async (req: any, res: any) => {
+  const signatures = req.body;
+  if (!signatures || typeof signatures !== 'object') {
+    return res.status(400).json({ error: "Payload must be a signatures object map" });
+  }
+
+  const count = Object.keys(signatures).length;
+  console.log(`[API] POST /api/signatures - Saving ${count} signatures...`);
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('epantau_storage').upsert({ id: 'signatures', content: signatures, updated_at: new Date() });
+      if (error) {
+        console.error("[API] Supabase error saving signatures:", error);
+        return res.status(500).json({ error: error.message });
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[API] Exception saving signatures to Supabase:", err);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    if (process.env.VERCEL) return res.status(503).json({ error: "Supabase required for Vercel persistence" });
+    try {
+      fs.writeFileSync(SIGNATURES_FILE, JSON.stringify(signatures, null, 2));
+      console.log(`[API] Signatures saved to local file: ${SIGNATURES_FILE}`);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[API] Error writing local signatures file:", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+};
+
 const postGeminiSummary = async (req: any, res: any) => {
   const { prompt } = req.body;
   if (!prompt) {
@@ -319,6 +374,11 @@ app.get("/api/lecturers", getLecturers);
 app.get("/lecturers", getLecturers);
 app.post("/api/lecturers", postLecturers);
 app.post("/lecturers", postLecturers);
+
+app.get("/api/signatures", getSignatures);
+app.get("/signatures", getSignatures);
+app.post("/api/signatures", postSignatures);
+app.post("/signatures", postSignatures);
 
 // Catch-all for API function
 app.use((req, res) => {

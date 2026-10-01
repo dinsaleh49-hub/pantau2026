@@ -99,6 +99,14 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('ipgkpt_lecturers');
     return saved ? JSON.parse(saved) : LECTURERS;
   });
+  const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('ipgkpt_signatures');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
@@ -106,16 +114,41 @@ const App: React.FC = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  const handleSaveSignature = async (name: string, signatureData: string) => {
+    if (!name || !signatureData) return;
+    const trimmed = name.trim();
+    setSavedSignatures(prev => {
+      const updated = { ...prev, [trimmed]: signatureData };
+      try {
+        localStorage.setItem('ipgkpt_signatures', JSON.stringify(updated));
+      } catch (e) {
+        console.warn("LocalStorage quota reached when saving signature:", e);
+      }
+      return updated;
+    });
+
+    try {
+      await fetch('/api/signatures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [trimmed]: signatureData })
+      });
+    } catch (err) {
+      console.warn("Could not sync signature to backend:", err);
+    }
+  };
+
   const fetchData = useCallback(async (isSilent = false) => {
     const isAnyLocalUpdate = isLocalUpdate.records || isLocalUpdate.schedules || isLocalUpdate.lecturers;
     if (isAnyLocalUpdate && isSilent) return; // Don't poll if we have unsynced local changes
     if (!isSilent) setIsSyncing(true);
     try {
-      const [recordsRes, schedulesRes, lecturersRes, healthRes] = await Promise.all([
+      const [recordsRes, schedulesRes, lecturersRes, healthRes, signaturesRes] = await Promise.all([
         fetch('/api/records'),
         fetch('/api/schedules'),
         fetch('/api/lecturers'),
-        fetch('/api/health')
+        fetch('/api/health'),
+        fetch('/api/signatures')
       ]);
       
       if (healthRes.ok) {
@@ -200,6 +233,21 @@ const App: React.FC = () => {
             setLecturersList([]);
             localStorage.setItem('ipgkpt_lecturers', JSON.stringify([]));
           }
+        }
+      }
+
+      if (signaturesRes.ok) {
+        const sigsData = await signaturesRes.json();
+        if (sigsData && typeof sigsData === 'object' && !Array.isArray(sigsData)) {
+          setSavedSignatures(prev => {
+            const merged = { ...prev, ...sigsData };
+            try {
+              localStorage.setItem('ipgkpt_signatures', JSON.stringify(merged));
+            } catch (e) {
+              console.warn("Storage quota warning on signatures:", e);
+            }
+            return merged;
+          });
         }
       }
     } catch (error: any) {
@@ -288,10 +336,14 @@ const App: React.FC = () => {
   ) => {
     console.log(`[Sync] Starting sync. Records: ${updatedRecords.length}, Schedules: ${updatedSchedules.length}, Lecturers: ${updatedLecturers.length}`);
     
-    // Update localStorage immediately
-    localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
-    localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
-    localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+    // Update localStorage immediately with quota protection
+    try {
+      localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
+      localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+      localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+    } catch (storageError) {
+      console.warn("[Sync] LocalStorage write error (quota reached), relying on server sync:", storageError);
+    }
 
     try {
       setIsSyncing(true);
@@ -339,6 +391,14 @@ const App: React.FC = () => {
     const trimmedName = record.lecturerName.trim();
     const normalizedRecord = { ...record, lecturerName: trimmedName };
     
+    // Save both signatures to persistent library so they are never lost
+    if (record.lecturerSignature && trimmedName) {
+      handleSaveSignature(trimmedName, record.lecturerSignature);
+    }
+    if (record.evaluatorSignature && record.evaluatorName?.trim()) {
+      handleSaveSignature(record.evaluatorName.trim(), record.evaluatorSignature);
+    }
+    
     // Update local states first for immediate UI feedback
     const updatedLecturers = [...lecturersList];
     const existingLecturerIndex = updatedLecturers.findIndex(l => l.name.toLowerCase() === trimmedName.toLowerCase());
@@ -370,7 +430,7 @@ const App: React.FC = () => {
     const success = await syncData(updatedRecords, updatedSchedules, updatedLecturers);
     
     if (success) {
-      showNotification('Rekod penilaian telah berjaya disimpan ke pelayan.');
+      showNotification('Rekod penilaian dan kedua-dua tandatangan berjaya disimpan!');
     }
     
     setEditingRecord(null);
@@ -674,6 +734,8 @@ const App: React.FC = () => {
               username={user.username}
               initialData={editingRecord || undefined} 
               onNotification={showNotification}
+              savedSignatures={savedSignatures}
+              onSaveSignature={handleSaveSignature}
             />
           </div>
         )}

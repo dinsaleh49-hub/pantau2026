@@ -20,9 +20,21 @@ interface Props {
   username?: string;
   initialData?: EvaluationRecord;
   onNotification?: (message: string, type: 'success' | 'error') => void;
+  savedSignatures?: Record<string, string>;
+  onSaveSignature?: (name: string, signatureData: string) => void;
 }
 
-export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept, isAdmin, username, initialData, onNotification }) => {
+export const EvaluationForm: React.FC<Props> = ({ 
+  onSubmit, 
+  lecturers, 
+  userDept, 
+  isAdmin, 
+  username, 
+  initialData, 
+  onNotification,
+  savedSignatures = {},
+  onSaveSignature
+}) => {
   const [formData, setFormData] = useState({
     campus: CAMPUSES[0],
     department: isAdmin ? '' : userDept,
@@ -43,6 +55,7 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
   const [itemRemarks, setItemRemarks] = useState<Record<string, string>>({});
   const [lecturerSig, setLecturerSig] = useState<string>('');
   const [evaluatorSig, setEvaluatorSig] = useState<string>('');
+  const [autoSaveSignatures, setAutoSaveSignatures] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -171,11 +184,21 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
 
     if (!lecturerSig || !evaluatorSig) {
       if (onNotification) {
-        onNotification('Sila pastikan kedua-dua pihak telah menurunkan tandatangan digital.', 'error');
+        onNotification('Sila pastikan kedua-dua pihak (Pensyarah & Pemantau) telah menurunkan tandatangan digital.', 'error');
       } else {
         alert('Sila pastikan kedua-dua pihak telah menurunkan tandatangan digital.');
       }
       return;
+    }
+
+    // Auto-save signatures to library if checked
+    if (autoSaveSignatures && onSaveSignature) {
+      if (formData.lecturerName.trim() && lecturerSig) {
+        onSaveSignature(formData.lecturerName.trim(), lecturerSig);
+      }
+      if (formData.evaluatorName.trim() && evaluatorSig) {
+        onSaveSignature(formData.evaluatorName.trim(), evaluatorSig);
+      }
     }
 
     const record: EvaluationRecord = {
@@ -472,19 +495,50 @@ export const EvaluationForm: React.FC<Props> = ({ onSubmit, lecturers, userDept,
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <SignaturePad 
-            label="Tandatangan Pensyarah" 
-            onSave={(data) => setLecturerSig(data)}
-            onClear={() => setLecturerSig('')}
-            initialSignature={initialData?.lecturerSignature}
-          />
-          <SignaturePad 
-            label="Tandatangan Pemantau" 
-            onSave={(data) => setEvaluatorSig(data)}
-            onClear={() => setEvaluatorSig('')}
-            initialSignature={initialData?.evaluatorSignature}
-          />
+        <div className="space-y-4 pt-2 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-indigo-50/60 p-4 rounded-2xl border border-indigo-100">
+            <div>
+              <h4 className="text-sm font-black text-indigo-900 flex items-center gap-2">
+                <SparklesIcon className="h-4 w-4 text-indigo-600" />
+                Pengesahan Tandatangan Digital (Kedua-dua Pihak)
+              </h4>
+              <p className="text-xs text-indigo-700/80 mt-0.5">
+                Kedua-dua tandatangan akan disimpan ke dalam rekod penilaian dan boleh disimpan ke profil untuk kegunaan seterusnya.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-indigo-200 shadow-sm shrink-0">
+              <input 
+                type="checkbox" 
+                checked={autoSaveSignatures} 
+                onChange={e => setAutoSaveSignatures(e.target.checked)}
+                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+              />
+              <span className="text-[11px] font-bold text-slate-700">
+                Simpan ke Profil (Auto-Save)
+              </span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <SignaturePad 
+              label="Tandatangan Pensyarah" 
+              personName={formData.lecturerName}
+              onSave={(data) => setLecturerSig(data)}
+              onClear={() => setLecturerSig('')}
+              initialSignature={initialData?.lecturerSignature}
+              savedSignature={savedSignatures[formData.lecturerName.trim()]}
+              onSaveToLibrary={(data) => onSaveSignature && onSaveSignature(formData.lecturerName.trim(), data)}
+            />
+            <SignaturePad 
+              label="Tandatangan Pemantau" 
+              personName={formData.evaluatorName}
+              onSave={(data) => setEvaluatorSig(data)}
+              onClear={() => setEvaluatorSig('')}
+              initialSignature={initialData?.evaluatorSignature}
+              savedSignature={savedSignatures[formData.evaluatorName.trim()]}
+              onSaveToLibrary={(data) => onSaveSignature && onSaveSignature(formData.evaluatorName.trim(), data)}
+            />
+          </div>
         </div>
       </div>
 

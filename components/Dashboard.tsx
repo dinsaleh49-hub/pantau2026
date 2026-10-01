@@ -916,14 +916,24 @@ export const Dashboard: React.FC<Props> = ({
                     {filteredRecords.map(record => {
                       const scores = Object.values(record.scores) as number[];
                       const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
+                      const hasBothSignatures = !!record.lecturerSignature && !!record.evaluatorSignature;
                       return (
                         <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-bold text-slate-800">{record.lecturerName}</p>
                               {record.lecturerName.includes('(KJ)') && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
+                              {hasBothSignatures ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-md border border-emerald-200">
+                                  <CheckBadgeIcon className="h-3 w-3 text-emerald-600" /> 2 Tandatangan Disimpan
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 text-[9px] font-bold px-2 py-0.5 rounded-md border border-amber-200">
+                                  Tandatangan Belum Lengkap
+                                </span>
+                              )}
                             </div>
-                            <p className="text-[10px] text-slate-400 uppercase">{formatDate(record.date)} • {record.code} • <span className="text-indigo-600 font-black">SKOR: {avg}</span></p>
+                            <p className="text-[10px] text-slate-400 uppercase mt-1">{formatDate(record.date)} • {record.code} • <span className="text-indigo-600 font-black">SKOR: {avg}</span></p>
                           </td>
                           <td className="px-6 py-4 flex justify-end items-center gap-1.5">
                             <button onClick={() => generatePDF(record, 'view')} className="flex items-center gap-1 px-2 py-1 bg-white border border-indigo-200 text-indigo-600 rounded text-xs font-bold hover:bg-indigo-50 transition-colors"><EyeIcon className="h-3.5 w-3.5" /> Lihat</button>
