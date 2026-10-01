@@ -6,7 +6,8 @@ import {
   CheckCircleIcon,
   SparklesIcon,
   PencilSquareIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 
 interface Props {
@@ -17,7 +18,10 @@ interface Props {
   onSave: (dataUrl: string) => void;
   onClear: () => void;
   onSaveToLibrary?: (signatureDataUrl: string) => void;
+  onDeleteFromLibrary?: () => void;
 }
+
+type SignatureSource = 'initial' | 'saved' | 'uploaded' | 'drawn' | null;
 
 export const SignaturePad: React.FC<Props> = ({ 
   label, 
@@ -26,13 +30,14 @@ export const SignaturePad: React.FC<Props> = ({
   savedSignature,
   onSave, 
   onClear,
-  onSaveToLibrary
+  onSaveToLibrary,
+  onDeleteFromLibrary
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
-  const [isSavedSource, setIsSavedSource] = useState(false);
+  const [sigSource, setSigSource] = useState<SignatureSource>(null);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -43,10 +48,10 @@ export const SignaturePad: React.FC<Props> = ({
 
   const showFeedback = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setFeedback({ message, type });
-    setTimeout(() => setFeedback(null), 3000);
+    setTimeout(() => setFeedback(null), 3500);
   };
 
-  const drawImageToCanvas = useCallback((dataUrl: string, markAsSaved = false, silent = false) => {
+  const drawImageToCanvas = useCallback((dataUrl: string, source: 'initial' | 'saved' | 'uploaded', silent = false) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -55,6 +60,7 @@ export const SignaturePad: React.FC<Props> = ({
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      // Clear previous canvas drawing
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const hRatio = canvas.width / img.width;
       const vRatio = canvas.height / img.height;
@@ -74,14 +80,26 @@ export const SignaturePad: React.FC<Props> = ({
         img.height * ratio
       );
       setHasSignature(true);
-      setIsSavedSource(markAsSaved);
+      setSigSource(source);
       userClearedRef.current = false;
       const finalDataUrl = canvas.toDataURL('image/png');
       onSave(finalDataUrl);
+
       if (!silent) {
-        showFeedback(markAsSaved ? 'Tandatangan tersimpan dimuatkan!' : 'Tandatangan sedia digunakan!', 'success');
+        if (source === 'uploaded') {
+          showFeedback('Tandatangan baru berjaya dimuat naik & sedia digunakan!', 'success');
+        } else if (source === 'saved') {
+          showFeedback('Tandatangan tersimpan daripada profil dimuatkan!', 'success');
+        } else {
+          showFeedback('Tandatangan sedia ada dimuatkan!', 'info');
+        }
       }
     };
+
+    img.onerror = () => {
+      showFeedback('Ralat membaca fail imej tandatangan. Sila cuba fail imej lain.', 'error');
+    };
+
     img.src = dataUrl;
   }, [onSave]);
 
@@ -97,10 +115,10 @@ export const SignaturePad: React.FC<Props> = ({
   useEffect(() => {
     if (userClearedRef.current) return;
 
-    if (initialSignature) {
-      drawImageToCanvas(initialSignature, false, true);
+    if (initialSignature && !hasSignature) {
+      drawImageToCanvas(initialSignature, 'initial', true);
     } else if (savedSignature && !hasSignature) {
-      drawImageToCanvas(savedSignature, true, true);
+      drawImageToCanvas(savedSignature, 'saved', true);
     }
   }, [initialSignature, savedSignature, hasSignature, drawImageToCanvas]);
 
@@ -118,7 +136,7 @@ export const SignaturePad: React.FC<Props> = ({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    // Only accept left mouse click (0) or touch/pen (which may be 0 or -1)
+    // Only accept left mouse click (0) or touch/pen
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     
     const canvas = canvasRef.current;
@@ -140,7 +158,7 @@ export const SignaturePad: React.FC<Props> = ({
     ctx.beginPath();
     ctx.moveTo(x, y);
     setIsDrawing(true);
-    setIsSavedSource(false);
+    setSigSource('drawn');
     userClearedRef.current = false;
   };
 
@@ -174,10 +192,12 @@ export const SignaturePad: React.FC<Props> = ({
       const dataUrl = canvas.toDataURL('image/png');
       onSave(dataUrl);
       setHasSignature(true);
+      setSigSource('drawn');
     }
   };
 
-  const clearCanvas = () => {
+  // Explicitly clear old/existing signature
+  const clearOldSignature = () => {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -185,16 +205,16 @@ export const SignaturePad: React.FC<Props> = ({
     }
     userClearedRef.current = true;
     setHasSignature(false);
-    setIsSavedSource(false);
+    setSigSource(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     onClear();
     onSave('');
-    showFeedback('Tandatangan dipadam. Sila tandatangan semula atau muat naik.', 'info');
+    showFeedback('Tandatangan lama telah dipadam. Sila muat naik tandatangan baru atau tandatangan di kanvas.', 'info');
   };
 
   const handleFileProcess = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      showFeedback('Sila pilih fail format imej (PNG, JPG, WEBP).', 'error');
+      showFeedback('Sila pilih fail berformat imej (PNG, JPG, JPEG, WEBP).', 'error');
       return;
     }
 
@@ -203,9 +223,11 @@ export const SignaturePad: React.FC<Props> = ({
       const result = event.target?.result as string;
       if (result) {
         userClearedRef.current = false;
-        drawImageToCanvas(result, false);
-        showFeedback('Fail imej tandatangan berjaya dimuat naik!', 'success');
+        drawImageToCanvas(result, 'uploaded');
       }
+    };
+    reader.onerror = () => {
+      showFeedback('Ralat membaca fail yang dimuat naik.', 'error');
     };
     reader.readAsDataURL(file);
   };
@@ -215,7 +237,7 @@ export const SignaturePad: React.FC<Props> = ({
     if (file) {
       handleFileProcess(file);
     }
-    e.target.value = ''; // Reset input to allow selecting same file again
+    e.target.value = ''; // Reset input to allow selecting the same file again
   };
 
   // Drag and drop handlers on canvas
@@ -244,7 +266,7 @@ export const SignaturePad: React.FC<Props> = ({
   const handleUseSaved = () => {
     if (savedSignature) {
       userClearedRef.current = false;
-      drawImageToCanvas(savedSignature, true);
+      drawImageToCanvas(savedSignature, 'saved');
     }
   };
 
@@ -254,32 +276,48 @@ export const SignaturePad: React.FC<Props> = ({
     const dataUrl = canvas.toDataURL('image/png');
     if (onSaveToLibrary) {
       onSaveToLibrary(dataUrl);
-      setIsSavedSource(true);
-      showFeedback('Tandatangan berjaya disimpan ke profil!', 'success');
+      setSigSource('saved');
+      showFeedback('Tandatangan baru ini berjaya disimpan ke profil!', 'success');
+    }
+  };
+
+  const handleDeleteSavedClick = () => {
+    if (onDeleteFromLibrary) {
+      onDeleteFromLibrary();
+      showFeedback('Tandatangan lama dalam profil telah dipadam.', 'info');
     }
   };
 
   return (
     <div className="space-y-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
-      {/* Header bar: Label & Status & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      {/* Header bar: Label & Status & Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <PencilSquareIcon className="h-4 w-4 text-indigo-600" />
               {label}
             </label>
             {hasSignature ? (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                isSavedSource 
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+              <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
+                sigSource === 'uploaded'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : sigSource === 'drawn'
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : sigSource === 'saved'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}>
                 <CheckCircleIcon className="h-3 w-3" />
-                {isSavedSource ? 'Tersimpan Dimuat' : 'Tandatangan Sedia'}
+                {sigSource === 'uploaded' && 'Tandatangan Baru Dimuat Naik'}
+                {sigSource === 'drawn' && 'Tandatangan Baru Dilukis'}
+                {sigSource === 'saved' && 'Tersimpan (Profil)'}
+                {sigSource === 'initial' && 'Tandatangan Sedia (Lama)'}
+                {!sigSource && 'Tandatangan Sedia'}
               </span>
             ) : (
-              <span className="text-[10px] font-semibold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+              <span className="text-[10px] font-semibold text-rose-500 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                 Belum Ditandatangani
               </span>
             )}
@@ -291,8 +329,33 @@ export const SignaturePad: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Action buttons: Padam, Muat Naik, Guna Tersimpan, Simpan Tetap */}
+        {/* Action buttons: Padam Yang Lama, Muat Naik Baru, Guna Tersimpan, Simpan Profil */}
         <div className="flex items-center flex-wrap gap-1.5">
+          {/* Button: Muat Naik Tandatangan Baru */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+            title="Muat naik fail imej tandatangan baru (PNG, JPG, JPEG, WEBP)"
+          >
+            <ArrowUpTrayIcon className="w-3.5 h-3.5" />
+            Muat Naik Baru
+          </button>
+
+          {/* Button: Padam Tandatangan Lama / Semasa */}
+          {hasSignature && (
+            <button
+              type="button"
+              onClick={clearOldSignature}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold rounded-lg border border-rose-300 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Padam tandatangan lama atau yang sedang dipaparkan"
+            >
+              <TrashIcon className="w-3.5 h-3.5 text-rose-600" />
+              Padam Yang Lama
+            </button>
+          )}
+
+          {/* Button: Guna Tersimpan jika ada dalam profil */}
           {savedSignature && (
             <button
               type="button"
@@ -305,15 +368,28 @@ export const SignaturePad: React.FC<Props> = ({
             </button>
           )}
 
+          {/* Button: Simpan ke Profil */}
           {hasSignature && onSaveToLibrary && (
             <button
               type="button"
               onClick={handleSaveToLibraryClick}
               className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-lg border border-emerald-300 transition-all flex items-center gap-1 shadow-sm active:scale-95"
-              title="Simpan tandatangan ini ke profil untuk kegunaan pemantauan seterusnya"
+              title="Simpan tandatangan ini ke profil untuk kegunaan borang seterusnya"
             >
               <BookmarkSquareIcon className="w-3.5 h-3.5 text-emerald-600" />
-              Simpan Tetap
+              Simpan Profil
+            </button>
+          )}
+
+          {/* Button: Padam dari Profil (jika ada disimpan di sistem) */}
+          {savedSignature && onDeleteFromLibrary && (
+            <button
+              type="button"
+              onClick={handleDeleteSavedClick}
+              className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-[10px] font-medium rounded-lg border border-slate-200 hover:border-rose-200 transition-all"
+              title="Padam tandatangan tersimpan dalam profil sistem"
+            >
+              <TrashIcon className="w-3.5 h-3.5" />
             </button>
           )}
 
@@ -322,45 +398,23 @@ export const SignaturePad: React.FC<Props> = ({
             type="file" 
             ref={fileInputRef} 
             onChange={handleFileInputChange} 
-            accept="image/*" 
+            accept="image/png, image/jpeg, image/jpg, image/webp" 
             className="hidden" 
           />
-
-          {/* Muat Naik Fail Button */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg border border-indigo-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
-            title="Muat naik fail imej tandatangan anda (PNG, JPG, WEBP)"
-          >
-            <ArrowUpTrayIcon className="w-3.5 h-3.5 text-indigo-600" />
-            Muat Naik
-          </button>
-
-          {/* Padam / Reset Button */}
-          <button
-            type="button"
-            onClick={clearCanvas}
-            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold rounded-lg border border-rose-300 transition-all flex items-center gap-1 shadow-sm active:scale-95"
-            title="Padam tandatangan ini jika berlaku kesilapan dan tandatangan semula"
-          >
-            <TrashIcon className="w-3.5 h-3.5 text-rose-600" />
-            Padam
-          </button>
         </div>
       </div>
 
-      {/* Canvas Drawing Area */}
+      {/* Canvas Drawing & Drop Area */}
       <div 
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`relative bg-slate-50/50 border-2 rounded-xl overflow-hidden transition-all shadow-inner ${
           isDraggingOver 
-            ? 'border-indigo-500 bg-indigo-50/40 ring-2 ring-indigo-200' 
+            ? 'border-indigo-500 bg-indigo-50/50 ring-4 ring-indigo-200' 
             : hasSignature 
-              ? 'border-emerald-300 bg-white' 
-              : 'border-dashed border-slate-300 hover:border-slate-400'
+              ? 'border-emerald-300 bg-white ring-1 ring-emerald-100' 
+              : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50/30'
         }`}
       >
         <canvas
@@ -368,7 +422,7 @@ export const SignaturePad: React.FC<Props> = ({
           width={400}
           height={140}
           style={{ touchAction: 'none' }}
-          className="w-full h-32 cursor-crosshair select-none bg-white block"
+          className="w-full h-36 cursor-crosshair select-none bg-white block"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -377,44 +431,68 @@ export const SignaturePad: React.FC<Props> = ({
 
         {/* Placeholder Watermark when empty */}
         {!hasSignature && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-4 text-center">
-            <p className="text-xs font-semibold text-slate-500">
-              ✍️ Tandatangan di sini
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-4 text-center select-none">
+            <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+              ✍️ Tandatangan di sini (Skrin Sentuh / Tetikus / Stylus)
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              atau klik butang <span className="font-bold text-indigo-600">"Muat Naik Baru"</span> untuk memuat naik fail imej
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">
-              (Skrin Sentuh / Tetikus / Stylus) atau tarik fail imej ke sini
+              (Format PNG, JPG, WEBP disokong)
             </p>
           </div>
         )}
 
-        {/* Clear overlay button on hover if signature exists */}
+        {/* Action Overlay Buttons inside the Canvas when signature exists */}
         {hasSignature && (
-          <button
-            type="button"
-            onClick={clearCanvas}
-            className="absolute top-2 right-2 px-2 py-1 bg-white/90 hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 text-[10px] font-bold rounded-md shadow-sm transition-all flex items-center gap-1 opacity-80 hover:opacity-100"
-            title="Padam untuk tandatangan semula jika berlaku kesilapan"
-          >
-            <ArrowPathIcon className="h-3 w-3" />
-            Tukar / Padam
-          </button>
+          <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-white/95 backdrop-blur-sm p-1 rounded-xl shadow-md border border-slate-200">
+            <button
+              type="button"
+              onClick={clearOldSignature}
+              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 text-[10px] font-bold rounded-lg border border-rose-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+              title="Padam tandatangan lama ini dan kosongkan ruang"
+            >
+              <TrashIcon className="h-3 w-3 text-rose-600" />
+              Padam
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 text-[10px] font-bold rounded-lg border border-indigo-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+              title="Muat naik fail imej tandatangan baru untuk menggantikan yang sedia ada"
+            >
+              <ArrowUpTrayIcon className="h-3 w-3 text-indigo-600" />
+              Muat Naik Baru
+            </button>
+          </div>
+        )}
+
+        {/* Drag-over indicator */}
+        {isDraggingOver && (
+          <div className="pointer-events-none absolute inset-0 bg-indigo-500/10 backdrop-blur-[1px] flex items-center justify-center border-2 border-dashed border-indigo-600 rounded-xl">
+            <div className="bg-white px-4 py-2 rounded-xl shadow-lg border border-indigo-200 flex items-center gap-2 text-xs font-bold text-indigo-700 animate-bounce">
+              <PhotoIcon className="w-4 h-4 text-indigo-600" />
+              Lepaskan fail imej di sini untuk muat naik
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Helper text & Toast Notification */}
-      <div className="flex justify-between items-center text-[10px] min-h-[18px]">
-        <span className="text-slate-400 italic">
-          Boleh ditandatangan secara langsung, dimuat naik dari fail, atau dipadam jika berlaku kesilapan.
+      {/* Guide text & Toast Feedback notification */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 text-[11px] min-h-[20px]">
+        <span className="text-slate-500 font-medium">
+          💡 Anda boleh <span className="font-bold text-rose-600">padam yang lama</span> dan <span className="font-bold text-indigo-600">muat naik tandatangan yang baru</span> atau lukis terus di ruang kanvas.
         </span>
         {feedback && (
-          <span className={`font-bold animate-in fade-in duration-200 flex items-center gap-1 ${
+          <span className={`font-bold animate-in fade-in duration-200 flex items-center gap-1 shrink-0 ${
             feedback.type === 'error' 
               ? 'text-rose-600' 
               : feedback.type === 'info' 
                 ? 'text-amber-600' 
                 : 'text-emerald-600'
           }`}>
-            <CheckCircleIcon className="h-3 w-3" /> {feedback.message}
+            <CheckCircleIcon className="h-3.5 w-3.5" /> {feedback.message}
           </span>
         )}
       </div>

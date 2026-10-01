@@ -139,6 +139,32 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteSavedSignature = async (name: string) => {
+    if (!name) return;
+    const trimmed = name.trim();
+    setSavedSignatures(prev => {
+      const updated = { ...prev };
+      delete updated[trimmed];
+      try {
+        localStorage.setItem('ipgkpt_signatures', JSON.stringify(updated));
+      } catch (e) {
+        console.warn("LocalStorage error on deleting signature:", e);
+      }
+      return updated;
+    });
+
+    try {
+      await fetch('/api/signatures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [trimmed]: null })
+      });
+      showNotification(`Tandatangan profil untuk ${trimmed} berjaya dipadam.`, 'success');
+    } catch (err) {
+      console.warn("Could not sync signature deletion to backend:", err);
+    }
+  };
+
   const fetchData = useCallback(async (isSilent = false) => {
     const isAnyLocalUpdate = isLocalUpdate.records || isLocalUpdate.schedules || isLocalUpdate.lecturers;
     if (isAnyLocalUpdate && isSilent) return; // Don't poll if we have unsynced local changes
@@ -759,6 +785,7 @@ const App: React.FC = () => {
               onNotification={showNotification}
               savedSignatures={savedSignatures}
               onSaveSignature={handleSaveSignature}
+              onDeleteSavedSignature={handleDeleteSavedSignature}
             />
           </div>
         )}

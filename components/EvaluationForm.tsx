@@ -23,6 +23,7 @@ interface Props {
   onNotification?: (message: string, type: 'success' | 'error') => void;
   savedSignatures?: Record<string, string>;
   onSaveSignature?: (name: string, signatureData: string) => void;
+  onDeleteSavedSignature?: (name: string) => void;
 }
 
 export const EvaluationForm: React.FC<Props> = ({ 
@@ -35,7 +36,8 @@ export const EvaluationForm: React.FC<Props> = ({
   initialData, 
   onNotification,
   savedSignatures = {},
-  onSaveSignature
+  onSaveSignature,
+  onDeleteSavedSignature
 }) => {
   const [formData, setFormData] = useState({
     campus: CAMPUSES[0],
@@ -565,6 +567,7 @@ export const EvaluationForm: React.FC<Props> = ({
               initialSignature={initialData?.lecturerSignature}
               savedSignature={savedSignatures[formData.lecturerName.trim()]}
               onSaveToLibrary={(data) => onSaveSignature && onSaveSignature(formData.lecturerName.trim(), data)}
+              onDeleteFromLibrary={() => onDeleteSavedSignature && onDeleteSavedSignature(formData.lecturerName.trim())}
             />
             <SignaturePad 
               label="Tandatangan Pemantau" 
@@ -574,6 +577,7 @@ export const EvaluationForm: React.FC<Props> = ({
               initialSignature={initialData?.evaluatorSignature}
               savedSignature={savedSignatures[formData.evaluatorName.trim()]}
               onSaveToLibrary={(data) => onSaveSignature && onSaveSignature(formData.evaluatorName.trim(), data)}
+              onDeleteFromLibrary={() => onDeleteSavedSignature && onDeleteSavedSignature(formData.evaluatorName.trim())}
             />
           </div>
         </div>

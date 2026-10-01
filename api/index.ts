@@ -283,22 +283,53 @@ const getSignatures = async (req: any, res: any) => {
 };
 
 const postSignatures = async (req: any, res: any) => {
-  const signatures = req.body;
-  if (!signatures || typeof signatures !== 'object') {
+  const incoming = req.body;
+  if (!incoming || typeof incoming !== 'object') {
     return res.status(400).json({ error: "Payload must be a signatures object map" });
   }
 
-  const count = Object.keys(signatures).length;
-  console.log(`[API] POST /api/signatures - Saving ${count} signatures...`);
+  // Load existing signatures
+  let current: Record<string, string> = {};
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('epantau_storage').select('content').eq('id', 'signatures').maybeSingle();
+      if (data?.content && typeof data.content === 'object') {
+        current = data.content;
+      }
+    } catch (e) {
+      console.warn("[API] Could not fetch existing signatures from Supabase for merge:", e);
+    }
+  } else {
+    try {
+      if (fs.existsSync(SIGNATURES_FILE)) {
+        current = JSON.parse(fs.readFileSync(SIGNATURES_FILE, "utf-8"));
+      }
+    } catch (e) {
+      console.warn("[API] Could not fetch existing signatures from local file for merge:", e);
+    }
+  }
+
+  // Merge updates or remove deleted keys
+  const merged: Record<string, string> = { ...current };
+  for (const [key, val] of Object.entries(incoming)) {
+    if (val === null || val === '' || val === undefined) {
+      delete merged[key];
+    } else {
+      merged[key] = val as string;
+    }
+  }
+
+  const count = Object.keys(merged).length;
+  console.log(`[API] POST /api/signatures - Saved ${count} signatures in library...`);
 
   if (supabase) {
     try {
-      const { error } = await supabase.from('epantau_storage').upsert({ id: 'signatures', content: signatures, updated_at: new Date() });
+      const { error } = await supabase.from('epantau_storage').upsert({ id: 'signatures', content: merged, updated_at: new Date() });
       if (error) {
         console.error("[API] Supabase error saving signatures:", error);
         return res.status(500).json({ error: error.message });
       }
-      res.json({ success: true });
+      res.json({ success: true, signatures: merged });
     } catch (err: any) {
       console.error("[API] Exception saving signatures to Supabase:", err);
       res.status(500).json({ error: err.message });
@@ -306,9 +337,9 @@ const postSignatures = async (req: any, res: any) => {
   } else {
     if (process.env.VERCEL) return res.status(503).json({ error: "Supabase required for Vercel persistence" });
     try {
-      fs.writeFileSync(SIGNATURES_FILE, JSON.stringify(signatures, null, 2));
+      fs.writeFileSync(SIGNATURES_FILE, JSON.stringify(merged, null, 2));
       console.log(`[API] Signatures saved to local file: ${SIGNATURES_FILE}`);
-      res.json({ success: true });
+      res.json({ success: true, signatures: merged });
     } catch (err: any) {
       console.error("[API] Error writing local signatures file:", err);
       res.status(500).json({ error: err.message });
