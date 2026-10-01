@@ -14,7 +14,8 @@ import {
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   CloudArrowUpIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  PencilSquareIcon
 } from '@heroicons/react/24/outline';
 
 interface ConfirmModalProps {
@@ -411,7 +412,8 @@ const App: React.FC = () => {
       updatedLecturers.push({ name: trimmedName, department: record.department });
     }
     
-    const updatedRecords = records.some(r => r.id === record.id)
+    const isEdit = records.some(r => r.id === record.id);
+    const updatedRecords = isEdit
       ? records.map(r => r.id === record.id ? normalizedRecord : r)
       : [normalizedRecord, ...records];
 
@@ -430,7 +432,11 @@ const App: React.FC = () => {
     const success = await syncData(updatedRecords, updatedSchedules, updatedLecturers);
     
     if (success) {
-      showNotification('Rekod penilaian dan kedua-dua tandatangan berjaya disimpan!');
+      if (isEdit) {
+        showNotification(`Rekod pemantauan untuk ${trimmedName} telah berjaya dikemaskini!`, 'success');
+      } else {
+        showNotification(`Rekod penilaian untuk ${trimmedName} dan kedua-dua tandatangan berjaya disimpan!`, 'success');
+      }
     }
     
     setEditingRecord(null);
@@ -654,15 +660,31 @@ const App: React.FC = () => {
                   Dashboard
                 </button>
                 
-                {!isRestrictedUser && (
-                  <button
-                    onClick={() => { setEditingRecord(null); setView('form'); }}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                      view === 'form' && !editingRecord ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
-                    }`}
-                  >
-                    + Borang
-                  </button>
+                {editingRecord ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                      <PencilSquareIcon className="h-4 w-4 text-amber-600" />
+                      Kemaskini: {editingRecord.lecturerName.split(' ')[0]}
+                    </span>
+                    <button
+                      onClick={() => { setEditingRecord(null); setView('dashboard'); }}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-all"
+                      title="Batal pengemaskinian dan kembali ke Dashboard"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                ) : (
+                  !isRestrictedUser && (
+                    <button
+                      onClick={() => { setEditingRecord(null); setView('form'); }}
+                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                        view === 'form' && !editingRecord ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      + Borang
+                    </button>
+                  )
                 )}
 
                 <button
@@ -728,6 +750,7 @@ const App: React.FC = () => {
             </button>
             <EvaluationForm 
               onSubmit={handleAddRecord} 
+              onCancel={() => { setEditingRecord(null); setView('dashboard'); }}
               lecturers={accessibleLecturers} 
               userDept={user.department}
               isAdmin={user.role === 'admin' || user.department === 'SEMUA'}

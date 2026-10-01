@@ -870,14 +870,27 @@ export const Dashboard: React.FC<Props> = ({
                   </div>
                   <div className="divide-y divide-slate-50">
                     {filteredRecords.slice(0, 5).map(record => (
-                      <div key={record.id} className="py-2 flex justify-between items-center group">
-                        <div>
+                      <div key={record.id} className="py-2.5 flex justify-between items-center group">
+                        <div className="pr-2">
                           <p className="text-[11px] font-bold text-slate-800">{record.lecturerName}</p>
-                          <p className="text-[9px] text-slate-400">{formatDate(record.date)}</p>
+                          <p className="text-[9px] text-slate-400">{formatDate(record.date)} • {record.code}</p>
                         </div>
-                        <button onClick={() => generatePDF(record, 'view')} className="p-1.5 bg-slate-50 rounded text-slate-400 group-hover:text-indigo-600 transition-colors">
-                          <EyeIcon className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => onEditRecord(record)} 
+                            className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 transition-colors shadow-sm"
+                            title="Kemaskini Rekod Penilaian"
+                          >
+                            <PencilSquareIcon className="h-3.5 w-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => generatePDF(record, 'view')} 
+                            className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-indigo-600 transition-colors"
+                            title="Lihat PDF"
+                          >
+                            <EyeIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -940,8 +953,14 @@ export const Dashboard: React.FC<Props> = ({
                             <button onClick={() => generatePDF(record, 'view')} className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs font-bold hover:bg-slate-50 transition-colors"><PrinterIcon className="h-3.5 w-3.5" /> Cetak</button>
                             <button onClick={() => generateAISummary(record)} className="flex items-center gap-1 px-2 py-1 bg-amber-500 text-white rounded text-xs font-bold hover:bg-amber-600 transition-colors"><SparklesIcon className="h-3.5 w-3.5" /> Rumusan</button>
                             <button onClick={() => generatePDF(record, 'save')} className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-100 transition-colors"><ArrowDownTrayIcon className="h-3.5 w-3.5" /> Muat Turun</button>
-                          <button onClick={() => onEditRecord(record)} className="p-1.5 text-slate-400 hover:text-emerald-600" title="Kemaskini Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
-                          {isAdminView && (
+                            <button 
+                              onClick={() => onEditRecord(record)} 
+                              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold transition-all shadow-sm active:scale-95" 
+                              title="Kemaskini Rekod Penilaian Ini"
+                            >
+                              <PencilSquareIcon className="h-3.5 w-3.5" /> Kemaskini
+                            </button>
+                            {isAdminView && (
                             <button 
                               onClick={() => handleSaveToDrive(record)} 
                               className={`p-1.5 transition-colors ${isSavingToDrive === record.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
@@ -1209,7 +1228,7 @@ export const Dashboard: React.FC<Props> = ({
                              )}
                              {(isAdminView || canEdit) && (
                                <>
-                                 <button onClick={() => onEditRecord(item.latestRecord!)} className="p-1.5 text-emerald-600 hover:text-emerald-800" title="Ubahsuai Rekod"><PencilSquareIcon className="h-4 w-4" /></button>
+                                 <button onClick={() => onEditRecord(item.latestRecord!)} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-sm transition-all active:scale-95" title="Kemaskini Rekod Pemantauan Terkini"><PencilSquareIcon className="h-3 w-3" /> Kemaskini</button>
                                  {isAdminView && (
                                    <button 
                                     onClick={() => handleSaveToDrive(item.latestRecord!)} 
@@ -1486,7 +1505,21 @@ export const Dashboard: React.FC<Props> = ({
                               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${isNew ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                 {isNew ? 'Baru' : (records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length > 1 ? `${records.filter(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()).length} Rekod` : 'Selesai')}
                               </span>
-                              {/* Action buttons removed */}
+                              {records.find(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()) && (
+                                <button 
+                                  onClick={() => {
+                                    const rec = records.find(r => r.lecturerName.toLowerCase() === l.name.toLowerCase());
+                                    if (rec) {
+                                      setSelectedDeptDetails(null);
+                                      onEditRecord(rec);
+                                    }
+                                  }}
+                                  className="px-2 py-0.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[9px] font-bold flex items-center gap-1 shadow-sm transition-all"
+                                  title="Kemaskini Rekod Pemantauan"
+                                >
+                                  <PencilSquareIcon className="h-3 w-3" /> Kemaskini
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -1719,6 +1752,13 @@ export const Dashboard: React.FC<Props> = ({
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Purata Skor</p>
                       </div>
                       <div className="flex gap-2">
+                        <button 
+                          onClick={() => { setSelectedLecturerHistory(null); onEditRecord(record); }} 
+                          className="p-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl transition-all shadow-sm" 
+                          title="Kemaskini Rekod Pemantauan Sesi Ini"
+                        >
+                          <PencilSquareIcon className="h-4 w-4" />
+                        </button>
                         <button 
                           onClick={() => generatePDF(record, 'view')} 
                           className="p-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
