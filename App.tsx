@@ -170,116 +170,160 @@ const App: React.FC = () => {
     if (isAnyLocalUpdate && isSilent) return; // Don't poll if we have unsynced local changes
     if (!isSilent) setIsSyncing(true);
     try {
-      const [recordsRes, schedulesRes, lecturersRes, healthRes, signaturesRes] = await Promise.all([
+      const results = await Promise.allSettled([
         fetch('/api/records'),
         fetch('/api/schedules'),
         fetch('/api/lecturers'),
         fetch('/api/health'),
         fetch('/api/signatures')
       ]);
-      
-      if (healthRes.ok) {
-        const health = await healthRes.json();
-        setPersistenceType(health.persistence);
-        setSupabaseStatus(health.supabase_status);
-        if (health.supabase_error) {
-          setSyncError(`Supabase: ${health.supabase_error}`);
+
+      const [recordsSettled, schedulesSettled, lecturersSettled, healthSettled, signaturesSettled] = results;
+
+      let anySuccess = false;
+
+      if (healthSettled.status === 'fulfilled' && healthSettled.value.ok) {
+        anySuccess = true;
+        try {
+          const health = await healthSettled.value.json();
+          setPersistenceType(health.persistence);
+          setSupabaseStatus(health.supabase_status);
+          if (health.supabase_error) {
+            setSyncError(`Supabase: ${health.supabase_error}`);
+          }
+        } catch (e) {
+          console.warn("Failed to parse health data:", e);
         }
       }
       
-      if (recordsRes.ok) {
-        const recordsData = await recordsRes.json();
-        if (Array.isArray(recordsData)) {
-          if (recordsData.length > 0) {
-            setRecords(recordsData);
-            localStorage.setItem('ipgkpt_records', JSON.stringify(recordsData));
-          } else if (isInitialLoad.current) {
-            // Migration logic only on first load if server is empty
-            const saved = localStorage.getItem('ipgkpt_records');
-            if (saved) {
-              const localRecords = JSON.parse(saved);
-              if (localRecords.length > 0) {
-                setRecords(localRecords);
-                // Push to server immediately
-                fetch('/api/records', {
+      if (recordsSettled.status === 'fulfilled' && recordsSettled.value.ok) {
+        anySuccess = true;
+        try {
+          const recordsData = await recordsSettled.value.json();
+          if (Array.isArray(recordsData)) {
+            if (recordsData.length > 0) {
+              setRecords(recordsData);
+              localStorage.setItem('ipgkpt_records', JSON.stringify(recordsData));
+            } else if (isInitialLoad.current) {
+              // Migration logic only on first load if server is empty
+              const saved = localStorage.getItem('ipgkpt_records');
+              if (saved) {
+                const localRecords = JSON.parse(saved);
+                if (localRecords.length > 0) {
+                  setRecords(localRecords);
+                  // Push to server immediately
+                  fetch('/api/records', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(localRecords)
+                  }).catch(console.error);
+                }
+              }
+            } else {
+              setRecords([]);
+              localStorage.setItem('ipgkpt_records', JSON.stringify([]));
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to parse records data:", e);
+        }
+      }
+
+      if (schedulesSettled.status === 'fulfilled' && schedulesSettled.value.ok) {
+        anySuccess = true;
+        try {
+          const schedulesData = await schedulesSettled.value.json();
+          if (Array.isArray(schedulesData)) {
+            if (schedulesData.length > 0) {
+              setSchedules(schedulesData);
+              localStorage.setItem('ipgkpt_schedules', JSON.stringify(schedulesData));
+            } else if (isInitialLoad.current) {
+              const saved = localStorage.getItem('ipgkpt_schedules');
+              if (saved && JSON.parse(saved).length > 0) {
+                const localSchedules = JSON.parse(saved);
+                setSchedules(localSchedules);
+                fetch('/api/schedules', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(localRecords)
+                  body: JSON.stringify(localSchedules)
                 }).catch(console.error);
               }
+            } else {
+              setSchedules([]);
+              localStorage.setItem('ipgkpt_schedules', JSON.stringify([]));
             }
-          } else {
-            setRecords([]);
-            localStorage.setItem('ipgkpt_records', JSON.stringify([]));
           }
+        } catch (e) {
+          console.warn("Failed to parse schedules data:", e);
         }
       }
 
-      if (schedulesRes.ok) {
-        const schedulesData = await schedulesRes.json();
-        if (Array.isArray(schedulesData)) {
-          if (schedulesData.length > 0) {
-            setSchedules(schedulesData);
-            localStorage.setItem('ipgkpt_schedules', JSON.stringify(schedulesData));
-          } else if (isInitialLoad.current) {
-            const saved = localStorage.getItem('ipgkpt_schedules');
-            if (saved && JSON.parse(saved).length > 0) {
-              const localSchedules = JSON.parse(saved);
-              setSchedules(localSchedules);
-              fetch('/api/schedules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(localSchedules)
-              }).catch(console.error);
+      if (lecturersSettled.status === 'fulfilled' && lecturersSettled.value.ok) {
+        anySuccess = true;
+        try {
+          const lecturersData = await lecturersSettled.value.json();
+          if (Array.isArray(lecturersData)) {
+            if (lecturersData.length > 0) {
+              setLecturersList(lecturersData);
+              localStorage.setItem('ipgkpt_lecturers', JSON.stringify(lecturersData));
+            } else if (isInitialLoad.current) {
+              const saved = localStorage.getItem('ipgkpt_lecturers');
+              if (saved && JSON.parse(saved).length > 0) {
+                const localLecturers = JSON.parse(saved);
+                setLecturersList(localLecturers);
+                fetch('/api/lecturers', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(localLecturers)
+                }).catch(console.error);
+              }
+            } else {
+              setLecturersList([]);
+              localStorage.setItem('ipgkpt_lecturers', JSON.stringify([]));
             }
-          } else {
-            setSchedules([]);
-            localStorage.setItem('ipgkpt_schedules', JSON.stringify([]));
           }
+        } catch (e) {
+          console.warn("Failed to parse lecturers data:", e);
         }
       }
 
-      if (lecturersRes.ok) {
-        const lecturersData = await lecturersRes.json();
-        if (Array.isArray(lecturersData)) {
-          if (lecturersData.length > 0) {
-            setLecturersList(lecturersData);
-            localStorage.setItem('ipgkpt_lecturers', JSON.stringify(lecturersData));
-          } else if (isInitialLoad.current) {
-            const saved = localStorage.getItem('ipgkpt_lecturers');
-            if (saved && JSON.parse(saved).length > 0) {
-              const localLecturers = JSON.parse(saved);
-              setLecturersList(localLecturers);
-              fetch('/api/lecturers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(localLecturers)
-              }).catch(console.error);
-            }
-          } else {
-            setLecturersList([]);
-            localStorage.setItem('ipgkpt_lecturers', JSON.stringify([]));
+      if (signaturesSettled.status === 'fulfilled' && signaturesSettled.value.ok) {
+        anySuccess = true;
+        try {
+          const sigsData = await signaturesSettled.value.json();
+          if (sigsData && typeof sigsData === 'object' && !Array.isArray(sigsData)) {
+            setSavedSignatures(prev => {
+              const merged = { ...prev, ...sigsData };
+              try {
+                localStorage.setItem('ipgkpt_signatures', JSON.stringify(merged));
+              } catch (e) {
+                console.warn("Storage quota warning on signatures:", e);
+              }
+              return merged;
+            });
           }
+        } catch (e) {
+          console.warn("Failed to parse signatures data:", e);
         }
       }
 
-      if (signaturesRes.ok) {
-        const sigsData = await signaturesRes.json();
-        if (sigsData && typeof sigsData === 'object' && !Array.isArray(sigsData)) {
-          setSavedSignatures(prev => {
-            const merged = { ...prev, ...sigsData };
-            try {
-              localStorage.setItem('ipgkpt_signatures', JSON.stringify(merged));
-            } catch (e) {
-              console.warn("Storage quota warning on signatures:", e);
-            }
-            return merged;
-          });
-        }
+      if (anySuccess) {
+        // Successfully connected to backend and synced
+        setSyncError(null);
+      } else {
+        const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+        setSyncError(isOffline 
+          ? "Di luar talian (data selamat disimpan secara setempat)" 
+          : "Sambungan pelayan tergendala seketika (menggunakan data setempat)"
+        );
       }
     } catch (error: any) {
       console.error("Error fetching data:", error);
-      setSyncError(error.message);
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+      setSyncError(isOffline 
+        ? "Di luar talian (data selamat disimpan secara setempat)" 
+        : `Sambungan pelayan tergendala: ${error.message || 'Sila cuba lagi'}`
+      );
     } finally {
       if (isInitialLoad.current) {
         isInitialLoad.current = false;
@@ -287,15 +331,34 @@ const App: React.FC = () => {
       setIsSyncing(false);
       setLastSync(new Date());
     }
-  }, []);
+  }, [isLocalUpdate]);
   
   // Initial data fetch and polling
   useEffect(() => {
     fetchData();
 
-    // Polling every 15 seconds for faster sync across devices
-    const interval = setInterval(() => fetchData(true), 15000);
-    return () => clearInterval(interval);
+    // Polling every 20 seconds for faster sync across devices
+    const interval = setInterval(() => fetchData(true), 20000);
+
+    const handleOnline = () => {
+      console.log("[App] Network back online, syncing...");
+      setSyncError(null);
+      fetchData(false);
+    };
+
+    const handleOffline = () => {
+      console.log("[App] Network offline.");
+      setSyncError("Di luar talian (data selamat disimpan secara setempat)");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, [fetchData]);
 
   const handleLogin = (userData: { username: string; department: string; role: 'admin' | 'user' }, remember: boolean) => {

@@ -411,8 +411,8 @@ app.get("/signatures", getSignatures);
 app.post("/api/signatures", postSignatures);
 app.post("/signatures", postSignatures);
 
-// Catch-all for API function
-app.use((req, res) => {
+// Catch-all for unknown /api routes only
+app.use('/api', (req, res) => {
   res.status(404).json({ 
     error: "API Route not found",
     url: req.url,
