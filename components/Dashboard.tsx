@@ -118,8 +118,17 @@ export const Dashboard: React.FC<Props> = ({
   const [analysisType, setAnalysisType] = useState<'lecturer' | 'department'>('department');
   const [deptMetric, setDeptMetric] = useState<'score' | 'count'>('score');
   
-  const [mainTab, setMainTab] = useState<'analytics' | 'status' | 'schedule' | 'summary'>(isRestricted ? 'schedule' : 'analytics');
+  const [mainTab, setMainTab] = useState<'analytics' | 'status' | 'schedule' | 'summary'>(isRestricted ? 'schedule' : 'status');
   
+  // Department scoping: Fixed for department users, selectable for Admin
+  const isFixedDept = !!userDept && userDept !== 'SEMUA';
+  const [selectedDepartment, setSelectedDepartment] = useState<string>(isFixedDept ? userDept : 'all');
+  const activeDepartment = isFixedDept ? userDept : selectedDepartment;
+  const isDeptView = activeDepartment !== 'all';
+  const currentDept = activeDepartment;
+
+  const effectiveTab = (isDeptView && (mainTab === 'analytics' || mainTab === 'summary')) ? 'status' : mainTab;
+
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('all');
   const [scheduleDeptFilter, setScheduleDeptFilter] = useState<string>('all');
   const [recordsDeptFilter, setRecordsDeptFilter] = useState<string>('all');
@@ -155,25 +164,73 @@ export const Dashboard: React.FC<Props> = ({
     location: ''
   });
 
+  // Lecturers, Records, and Schedules strictly scoped when viewing a department
+  const currentDeptLecturers = useMemo(() => {
+    if (isDeptView) {
+      const source = (allLecturers && allLecturers.length > 0) ? allLecturers : lecturers;
+      return source.filter(l => l.department === currentDept);
+    }
+    return allLecturers;
+  }, [allLecturers, lecturers, isDeptView, currentDept]);
+
+  const currentDeptRecords = useMemo(() => {
+    if (isDeptView) {
+      return records.filter(r => r.department === currentDept);
+    }
+    return records;
+  }, [records, isDeptView, currentDept]);
+
+  const currentDeptSchedules = useMemo(() => {
+    if (isDeptView) {
+      return schedules.filter(s => s.department === currentDept);
+    }
+    return schedules;
+  }, [schedules, isDeptView, currentDept]);
+
+  const deptStats = useMemo(() => {
+    if (!isDeptView) return null;
+    const total = currentDeptLecturers.length;
+    const monitored = currentDeptLecturers.filter(l => currentDeptRecords.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()));
+    const unmonitored = currentDeptLecturers.filter(l => !currentDeptRecords.some(r => r.lecturerName.toLowerCase() === l.name.toLowerCase()));
+    const kj = currentDeptLecturers.find(l => l.name.includes('(KJ)'));
+    const kjMonitored = kj ? currentDeptRecords.some(r => r.lecturerName.toLowerCase() === kj.name.toLowerCase()) : false;
+    const percentage = total > 0 ? Math.round((monitored.length / total) * 100) : 0;
+    
+    return {
+      total,
+      monitoredCount: monitored.length,
+      unmonitoredCount: unmonitored.length,
+      percentage,
+      kj,
+      kjMonitored
+    };
+  }, [isDeptView, currentDeptLecturers, currentDeptRecords]);
+
   const filteredRecords = useMemo(() => {
-    return records.filter(r => 
+    const baseList = isDeptView ? currentDeptRecords : records;
+    const filterDept = isDeptView ? currentDept : recordsDeptFilter;
+    return baseList.filter(r => 
       r.lecturerName.toLowerCase().includes(searchTerm.toLowerCase()) &&
       (!onlyKJRecords || r.lecturerName.includes('(KJ)')) &&
-      (recordsDeptFilter === 'all' || r.department === recordsDeptFilter)
+      (filterDept === 'all' || r.department === filterDept)
     );
-  }, [records, searchTerm, onlyKJRecords, recordsDeptFilter]);
+  }, [records, currentDeptRecords, searchTerm, onlyKJRecords, recordsDeptFilter, isDeptView, currentDept]);
 
   const newLecturers = useMemo(() => {
     return allLecturers.filter(l => !LECTURERS.some(staticL => staticL.name.toLowerCase() === l.name.toLowerCase()));
   }, [allLecturers]);
 
   const monitoringStatus = useMemo(() => {
-    return lecturers
-      .filter(l => selectedDeptFilter === 'all' || l.department === selectedDeptFilter)
+    const baseList = isDeptView ? currentDeptLecturers : lecturers;
+    const filterDept = isDeptView ? currentDept : selectedDeptFilter;
+    const recordsSource = isDeptView ? currentDeptRecords : records;
+
+    return baseList
+      .filter(l => filterDept === 'all' || l.department === filterDept)
       .filter(l => !onlyKJ || l.name.includes('(KJ)'))
       .filter(l => l.name.toLowerCase().includes(statusSearchTerm.toLowerCase()))
       .map(lec => {
-        const lecturerRecords = records.filter(r => 
+        const lecturerRecords = recordsSource.filter(r => 
           r.lecturerName.toLowerCase() === lec.name.toLowerCase() && 
           r.department === lec.department
         );
@@ -201,7 +258,7 @@ export const Dashboard: React.FC<Props> = ({
         };
       })
       .filter(item => item.name.toLowerCase().includes(statusSearchTerm.toLowerCase()));
-  }, [records, lecturers, statusSearchTerm, selectedDeptFilter, onlyKJ]);
+  }, [records, lecturers, currentDeptLecturers, currentDeptRecords, statusSearchTerm, selectedDeptFilter, onlyKJ, isDeptView, currentDept]);
 
   const unmonitoredLecturersOverall = useMemo(() => {
     return allLecturers.filter(l => !records.some(r => 
@@ -265,22 +322,26 @@ export const Dashboard: React.FC<Props> = ({
   }, [itemAnalysis]);
 
   const filteredSchedules = useMemo(() => {
-    return schedules
-      .filter(s => scheduleDeptFilter === 'all' || s.department === scheduleDeptFilter)
+    const baseList = isDeptView ? currentDeptSchedules : schedules;
+    const filterDept = isDeptView ? currentDept : scheduleDeptFilter;
+    return baseList
+      .filter(s => filterDept === 'all' || s.department === filterDept)
       .filter(s => !onlyKJSchedule || s.lecturerName.includes('(KJ)'))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [schedules, scheduleDeptFilter, onlyKJSchedule]);
+  }, [schedules, currentDeptSchedules, scheduleDeptFilter, onlyKJSchedule, isDeptView, currentDept]);
 
   const upcomingSchedules = useMemo(() => {
-    return schedules
+    const baseList = isDeptView ? currentDeptSchedules : schedules;
+    return baseList
       .filter(s => s.status === 'Pending')
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 5);
-  }, [schedules]);
+  }, [schedules, currentDeptSchedules, isDeptView]);
 
   const activeDepartments = useMemo(() => {
-    const depts = Array.from(new Set(allLecturers.map(l => l.department)));
-    return depts.sort();
+    const fromLecturers = allLecturers.map(l => l.department);
+    const combined = Array.from(new Set([...DEPARTMENTS, ...fromLecturers]));
+    return combined.filter(Boolean).sort();
   }, [allLecturers]);
 
   const departmentMonitoringStats = useMemo(() => {
@@ -491,7 +552,11 @@ export const Dashboard: React.FC<Props> = ({
 
   const handleNewLecturer = () => {
     setEditingLecturer(null);
-    setLecturerFormData({ name: '', department: isAdminView ? '' : (userDept || ''), isKJ: false });
+    setLecturerFormData({ 
+      name: '', 
+      department: isDeptView ? currentDept : (isAdminView ? '' : (userDept || '')), 
+      isKJ: false 
+    });
     setIsOtherDept(false);
     setShowLecturerModal(true);
   };
@@ -513,7 +578,7 @@ export const Dashboard: React.FC<Props> = ({
     
     const submissionData = {
       name: finalName,
-      department: lecturerFormData.department
+      department: isDeptView ? currentDept : lecturerFormData.department
     };
 
     if (editingLecturer) {
@@ -552,14 +617,16 @@ export const Dashboard: React.FC<Props> = ({
 
   const handleScheduleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const lecturer = allLecturers.find(l => l.name === schedForm.lecturerName);
+    const candidateList = isDeptView ? currentDeptLecturers : allLecturers;
+    const lecturer = candidateList.find(l => l.name === schedForm.lecturerName) || allLecturers.find(l => l.name === schedForm.lecturerName) || lecturers.find(l => l.name === schedForm.lecturerName);
     if (!lecturer) return;
+    const deptToAssign = isDeptView ? currentDept : lecturer.department;
     if (editingScheduleId) {
       const existing = schedules.find(s => s.id === editingScheduleId);
       const updated: MonitoringSchedule = {
         ...schedForm,
         id: editingScheduleId,
-        department: lecturer.department,
+        department: deptToAssign,
         timestamp: existing?.timestamp || Date.now(),
         status: existing?.status || 'Pending'
       };
@@ -568,7 +635,7 @@ export const Dashboard: React.FC<Props> = ({
       const newSched: MonitoringSchedule = {
         ...schedForm,
         id: Math.random().toString(36).substr(2, 9),
-        department: lecturer.department,
+        department: deptToAssign,
         timestamp: Date.now(),
         status: 'Pending'
       };
@@ -603,7 +670,9 @@ export const Dashboard: React.FC<Props> = ({
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">PINTAR-Dash</h2>
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Status PINTAR-Dash</p>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+              {isDeptView ? `Paparan Jabatan: ${currentDept}` : 'Status PINTAR-Dash'}
+            </p>
             {lastSync && (
               <p className="text-[9px] text-slate-400 font-medium italic">
                 • Dikemaskini: {lastSync.toLocaleTimeString()}
@@ -611,7 +680,35 @@ export const Dashboard: React.FC<Props> = ({
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdminView && (
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+              <BuildingOfficeIcon className="h-4 w-4 text-indigo-600" />
+              <span className="text-[11px] font-bold text-slate-500">Paparan:</span>
+              <select 
+                value={selectedDepartment}
+                onChange={e => {
+                  setSelectedDepartment(e.target.value);
+                  if (e.target.value !== 'all') {
+                    setMainTab('status');
+                  }
+                }}
+                className="bg-transparent text-xs font-black text-indigo-700 outline-none cursor-pointer"
+              >
+                <option value="all">Semua Jabatan (Seluruh Kampus)</option>
+                {activeDepartments.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {isFixedDept && (
+            <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5">
+              <BuildingOfficeIcon className="h-4 w-4 text-indigo-600" />
+              <span className="text-xs font-black text-indigo-800">{userDept}</span>
+              <span className="text-[9px] font-bold text-indigo-500 bg-white px-1.5 py-0.5 rounded border border-indigo-100 uppercase">Jabatan Sahaja</span>
+            </div>
+          )}
           {onRefresh && (
             <button onClick={onRefresh} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm group">
               <ArrowPathIcon className="h-4 w-4 text-indigo-600 group-active:animate-spin" /> Kemaskini Data
@@ -621,15 +718,15 @@ export const Dashboard: React.FC<Props> = ({
             <InformationCircleIcon className="h-4 w-4 text-indigo-600" /> Panduan
           </button>
           <button onClick={() => handleNewSchedule()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 rounded-xl text-sm font-bold text-white hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
-            <CalendarIcon className="h-4 w-4" /> Daftar Jadual
+            <CalendarIcon className="h-4 w-4" /> Daftar Jadual {isDeptView ? `(${currentDept})` : ''}
           </button>
           
           {!isRestricted && (
             <>
-              <button onClick={() => generateFullDepartmentPDF(records, 'view')} className="flex items-center gap-2 px-4 py-2 bg-purple-50 border border-purple-200 rounded-xl text-sm font-bold text-purple-700 hover:bg-purple-100 transition-all shadow-sm">
+              <button onClick={() => generateFullDepartmentPDF(isDeptView ? currentDeptRecords : records, 'view')} className="flex items-center gap-2 px-4 py-2 bg-purple-50 border border-purple-200 rounded-xl text-sm font-bold text-purple-700 hover:bg-purple-100 transition-all shadow-sm">
                 <EyeIcon className="h-4 w-4" /> Lihat Rekod
               </button>
-              <button onClick={() => generateSummaryPDF(lecturerStats, departmentStats, overallMean, records.length, 'save')} className="flex items-center gap-2 px-4 py-2 bg-slate-800 rounded-xl text-sm font-bold text-white hover:bg-slate-900 transition-all shadow-lg shadow-slate-200">
+              <button onClick={() => generateSummaryPDF(lecturerStats, departmentStats, overallMean, (isDeptView ? currentDeptRecords : records).length, 'save')} className="flex items-center gap-2 px-4 py-2 bg-slate-800 rounded-xl text-sm font-bold text-white hover:bg-slate-900 transition-all shadow-lg shadow-slate-200">
                 <PrinterIcon className="h-4 w-4" /> Cetak Ringkasan
               </button>
               <button onClick={exportToCSV} className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm font-bold text-amber-700 hover:bg-amber-100 transition-all shadow-sm">
@@ -646,31 +743,48 @@ export const Dashboard: React.FC<Props> = ({
       </div>
 
       <div className="flex border-b border-slate-200 gap-8 overflow-x-auto whitespace-nowrap pb-1">
-        {!isRestricted && (
+        {isDeptView ? (
           <>
-            <button onClick={() => setMainTab('analytics')} className={`pb-4 text-sm font-bold transition-all relative ${mainTab === 'analytics' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
-              Rekod & Analisis
-              {mainTab === 'analytics' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
-            </button>
-            <button onClick={() => setMainTab('status')} className={`pb-4 text-sm font-bold transition-all relative ${mainTab === 'status' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
-              Status Pemantauan
-              {mainTab === 'status' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
+            {!isRestricted && (
+              <button onClick={() => setMainTab('status')} className={`pb-4 text-sm font-bold transition-all relative ${effectiveTab === 'status' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                Status Penilaian ({currentDept})
+                {effectiveTab === 'status' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
+              </button>
+            )}
+            <button onClick={() => setMainTab('schedule')} className={`pb-4 text-sm font-bold transition-all relative ${effectiveTab === 'schedule' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              Pendaftaran Jadual ({currentDept})
+              {effectiveTab === 'schedule' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
             </button>
           </>
-        )}
-        <button onClick={() => setMainTab('schedule')} className={`pb-4 text-sm font-bold transition-all relative ${mainTab === 'schedule' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
-          Jadual Pemantauan
-          {mainTab === 'schedule' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
-        </button>
-        {!isRestricted && (
-          <button onClick={() => setMainTab('summary')} className={`pb-4 text-sm font-bold transition-all relative ${mainTab === 'summary' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
-            Rumusan Analisis
-            {mainTab === 'summary' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
-          </button>
+        ) : (
+          <>
+            {!isRestricted && (
+              <>
+                <button onClick={() => setMainTab('analytics')} className={`pb-4 text-sm font-bold transition-all relative ${mainTab === 'analytics' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                  Rekod & Analisis
+                  {mainTab === 'analytics' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
+                </button>
+                <button onClick={() => setMainTab('status')} className={`pb-4 text-sm font-bold transition-all relative ${mainTab === 'status' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                  Status Pemantauan
+                  {mainTab === 'status' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
+                </button>
+              </>
+            )}
+            <button onClick={() => setMainTab('schedule')} className={`pb-4 text-sm font-bold transition-all relative ${mainTab === 'schedule' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              Jadual Pemantauan
+              {mainTab === 'schedule' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
+            </button>
+            {!isRestricted && (
+              <button onClick={() => setMainTab('summary')} className={`pb-4 text-sm font-bold transition-all relative ${mainTab === 'summary' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                Rumusan Analisis
+                {mainTab === 'summary' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
+              </button>
+            )}
+          </>
         )}
       </div>
 
-      {mainTab === 'analytics' && !isRestricted && (
+      {!isDeptView && mainTab === 'analytics' && !isRestricted && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
@@ -987,7 +1101,7 @@ export const Dashboard: React.FC<Props> = ({
         </>
       )}
 
-      {mainTab === 'status' && !isRestricted && (
+      {!isDeptView && mainTab === 'status' && !isRestricted && (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
           {newLecturers.length > 0 && (
             <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -1073,12 +1187,22 @@ export const Dashboard: React.FC<Props> = ({
                     {dept.kjMonitored && <div className="absolute top-2 right-2 text-rose-600"><CheckBadgeIcon className="h-5 w-5" /></div>}
                     <div className="flex justify-between items-center">
                       <h4 className="text-sm font-black text-slate-800">{dept.name}</h4>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={() => {
+                            setSelectedDepartment(dept.name);
+                            setMainTab('status');
+                          }}
+                          className="text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-700 px-2 py-0.5 rounded-lg shadow-sm transition-all active:scale-95"
+                          title={`Buka Paparan Jabatan untuk ${dept.name}`}
+                        >
+                          Paparan Jabatan
+                        </button>
                         <button 
                           onClick={() => setSelectedDeptDetails(dept.name)}
-                          className="text-[10px] font-black text-indigo-600 hover:underline"
+                          className="text-[10px] font-bold text-slate-500 hover:underline"
                         >
-                          Lihat Semua ({dept.total})
+                          Perincian ({dept.total})
                         </button>
                       </div>
                     </div>
@@ -1268,20 +1392,321 @@ export const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
-      {mainTab === 'schedule' && (
+      {/* Dedicated Department View - Status Penilaian */}
+      {isDeptView && effectiveTab === 'status' && !isRestricted && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          {/* Department Banner & Summary KPI Cards */}
+          <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+            <div className="relative z-10">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white backdrop-blur-sm border border-white/20">
+                      Paparan Jabatan Sahaja
+                    </span>
+                    {isAdminView && (
+                      <button 
+                        onClick={() => setSelectedDepartment('all')}
+                        className="text-xs text-indigo-200 hover:text-white underline font-bold transition-colors"
+                      >
+                        ← Kembali ke Seluruh Kampus
+                      </button>
+                    )}
+                  </div>
+                  <h3 className="text-2xl sm:text-3xl font-black tracking-tight">{currentDept}</h3>
+                  <p className="text-xs text-indigo-200 mt-1 font-medium">
+                    Status penilaian dan pendaftaran jadual pensyarah di {currentDept} sahaja.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleNewSchedule()} 
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-900 hover:bg-indigo-50 rounded-xl text-xs font-black shadow-md transition-all active:scale-95"
+                  >
+                    <CalendarIcon className="h-4 w-4 text-indigo-600" />
+                    Daftar Jadual ({currentDept})
+                  </button>
+                  <button 
+                    onClick={handleNewLecturer} 
+                    className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black border border-indigo-400 shadow-md transition-all active:scale-95"
+                  >
+                    <UserPlusIcon className="h-4 w-4" />
+                    + Tambah Pensyarah
+                  </button>
+                </div>
+              </div>
+
+              {/* Department KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Jumlah Pensyarah</p>
+                  <p className="text-2xl font-black text-white mt-1">{deptStats?.total || 0}</p>
+                  <p className="text-[9px] text-indigo-300 font-medium">Pensyarah di {currentDept}</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300">Telah Dinilai</p>
+                  <p className="text-2xl font-black text-emerald-400 mt-1">{deptStats?.monitoredCount || 0}</p>
+                  <p className="text-[9px] text-emerald-200 font-medium">Selesai dipantau</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-300">Belum Dinilai</p>
+                  <p className="text-2xl font-black text-rose-400 mt-1">{deptStats?.unmonitoredCount || 0}</p>
+                  <p className="text-[9px] text-rose-200 font-medium">Menunggu pemantauan</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Peratus Selesai</p>
+                  <p className="text-2xl font-black text-white mt-1">{deptStats?.percentage || 0}%</p>
+                  <p className="text-[9px] text-indigo-300 font-medium">Kadar pemantauan</p>
+                </div>
+                <div className="col-span-2 sm:col-span-1 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-300">Ketua Jabatan (KJ)</p>
+                  <p className="text-sm font-black text-white mt-1 truncate" title={deptStats?.kj?.name || 'Tiada penama KJ'}>
+                    {deptStats?.kj ? deptStats.kj.name.replace(' (KJ)', '').replace('(KJ)', '') : 'Tiada Penama'}
+                  </p>
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                    deptStats?.kjMonitored ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
+                  }`}>
+                    {deptStats?.kjMonitored ? '✓ Selesai Dipantau' : '⏳ Belum Dipantau'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Lecturer Monitoring Status Table (Department Lecturers Only) */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <UsersIcon className="h-6 w-6 text-indigo-600" /> 
+                  Status Penilaian Pensyarah ({currentDept})
+                </h3>
+                <p className="text-xs text-slate-400 font-bold mt-1 uppercase">
+                  Semakan status pemantauan bagi semua pensyarah di {currentDept} sahaja
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
+                  <input type="checkbox" checked={onlyKJ} onChange={e => setOnlyKJ(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
+                  <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
+                </label>
+                <div className="relative flex-1 sm:flex-initial">
+                  <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type="text" placeholder="Cari nama pensyarah..." value={statusSearchTerm} onChange={e => setStatusSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <button onClick={handleNewLecturer} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-indigo-700 transition-all">
+                  <UserPlusIcon className="h-4 w-4" /> + Tambah Pensyarah
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px]">
+                    <th className="px-6 py-4">Nama Pensyarah ({currentDept})</th>
+                    <th className="px-6 py-4">Status Penilaian</th>
+                    <th className="px-6 py-4 text-right">Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {monitoringStatus.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-slate-800">{item.name}</p>
+                          {item.isKJ && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
+                          {!LECTURERS.some(l => l.name.toLowerCase() === item.name.toLowerCase()) && (
+                            <span className="bg-indigo-50 text-indigo-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-indigo-100 flex items-center gap-0.5">
+                              <SparklesIcon className="h-2 w-2" /> Baru
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium">{item.department}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {item.isMonitored ? (
+                          <div className="flex flex-col">
+                            <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg text-[10px] uppercase font-black border border-emerald-200 inline-block w-fit">
+                              ✓ Dipantau
+                            </span>
+                            <span className="text-[10px] text-slate-500 mt-1 font-bold">
+                              Purata Skor: <span className="text-indigo-600 font-black">{item.avgScore}</span> ({item.count} rekod)
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg text-[10px] uppercase font-bold border border-rose-100">
+                            ⏳ Belum Dinilai
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-1.5 items-center flex-wrap">
+                          {item.isMonitored && item.latestRecord && (
+                            <>
+                              <button 
+                                onClick={() => generatePDF(item.latestRecord!, 'view')} 
+                                className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-[10px] font-bold hover:bg-slate-50 transition-colors"
+                              >
+                                <EyeIcon className="h-3 w-3" /> Lihat PDF
+                              </button>
+                              <button 
+                                onClick={() => generatePDF(item.latestRecord!, 'view')} 
+                                className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-[10px] font-bold hover:bg-slate-50 transition-colors"
+                              >
+                                <PrinterIcon className="h-3 w-3" /> Cetak
+                              </button>
+                              <button onClick={() => generateAISummary(item.name)} className="p-1.5 text-amber-500 hover:text-amber-600" title="Rumusan AI"><SparklesIcon className="h-4 w-4" /></button>
+                              {item.count > 1 && (
+                                <button 
+                                  onClick={() => setSelectedLecturerHistory({ name: item.name, records: item.allRecords })} 
+                                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-indigo-600 rounded text-[10px] font-bold hover:bg-indigo-50 transition-colors"
+                                  title="Lihat Sejarah Pemantauan"
+                                >
+                                  <ClockIcon className="h-3 w-3" /> Sejarah ({item.count})
+                                </button>
+                              )}
+                              <button onClick={() => onEditRecord(item.latestRecord!)} className="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-sm transition-all" title="Kemaskini Rekod Penilaian"><PencilSquareIcon className="h-3 w-3" /> Kemaskini</button>
+                              <button 
+                                onClick={() => generatePDF(item.latestRecord!, 'save')} 
+                                className="flex items-center gap-1 px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-[10px] font-bold hover:bg-indigo-100 transition-colors"
+                              >
+                                <ArrowDownTrayIcon className="h-3 w-3" /> Muat Turun
+                              </button>
+                            </>
+                          )}
+                          <button onClick={() => handleNewSchedule(item.name)} className="flex items-center gap-1 px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded text-[10px] font-bold hover:bg-indigo-100" title="Daftar Jadual untuk pensyarah ini">
+                            <CalendarIcon className="h-3 w-3" /> Jadual
+                          </button>
+                          {(isAdminView || canEdit) && (
+                            <button 
+                              onClick={() => onDeleteLecturer(item.name, item.department)} 
+                              className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors" 
+                              title="Padam Pensyarah"
+                            >
+                              <TrashIcon className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {monitoringStatus.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-12 text-center text-slate-400 italic">
+                        Tiada pensyarah ditemui untuk carian ini dalam {currentDept}.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Full Evaluation Records of this Department */}
+          <div className="bg-white rounded-3xl border border-slate-200 flex flex-col shadow-sm overflow-hidden">
+             <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Senarai Penuh Rekod Penilaian Selesai ({currentDept})</h3>
+                  <p className="text-xs text-slate-400 font-bold mt-0.5">Terdapat {filteredRecords.length} rekod penilaian rasmi bagi jabatan ini</p>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type="text" placeholder="Cari pensyarah..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+             </div>
+             <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead><tr className="bg-slate-50/50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px] tracking-widest"><th className="px-6 py-3">Maklumat Penilaian</th><th className="px-6 py-3 text-right">Tindakan</th></tr></thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredRecords.map(record => {
+                      const scores = Object.values(record.scores) as number[];
+                      const avg = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2) : '0.00';
+                      const hasBothSignatures = !!record.lecturerSignature && !!record.evaluatorSignature;
+                      return (
+                        <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-slate-800">{record.lecturerName}</p>
+                              {record.lecturerName.includes('(KJ)') && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
+                              {hasBothSignatures ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-md border border-emerald-200">
+                                  <CheckBadgeIcon className="h-3 w-3 text-emerald-600" /> 2 Tandatangan Disimpan
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 text-[9px] font-bold px-2 py-0.5 rounded-md border border-amber-200">
+                                  Tandatangan Belum Lengkap
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 uppercase mt-1">{formatDate(record.date)} • {record.code} • {record.course} • <span className="text-indigo-600 font-black">SKOR: {avg}</span></p>
+                          </td>
+                          <td className="px-6 py-4 flex justify-end items-center gap-1.5 flex-wrap">
+                            <button onClick={() => generatePDF(record, 'view')} className="flex items-center gap-1 px-2 py-1 bg-white border border-indigo-200 text-indigo-600 rounded text-xs font-bold hover:bg-indigo-50 transition-colors"><EyeIcon className="h-3.5 w-3.5" /> Lihat</button>
+                            <button onClick={() => generatePDF(record, 'view')} className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs font-bold hover:bg-slate-50 transition-colors"><PrinterIcon className="h-3.5 w-3.5" /> Cetak</button>
+                            <button onClick={() => generateAISummary(record)} className="flex items-center gap-1 px-2 py-1 bg-amber-500 text-white rounded text-xs font-bold hover:bg-amber-600 transition-colors"><SparklesIcon className="h-3.5 w-3.5" /> Rumusan</button>
+                            <button onClick={() => generatePDF(record, 'save')} className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-100 transition-colors"><ArrowDownTrayIcon className="h-3.5 w-3.5" /> Muat Turun</button>
+                            <button 
+                              onClick={() => onEditRecord(record)} 
+                              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold transition-all shadow-sm active:scale-95" 
+                              title="Kemaskini Rekod Penilaian Ini"
+                            >
+                              <PencilSquareIcon className="h-3.5 w-3.5" /> Kemaskini
+                            </button>
+                            {isAdminView && (
+                              <button 
+                                onClick={() => handleSaveToDrive(record)} 
+                                className={`p-1.5 transition-colors ${isSavingToDrive === record.id ? 'text-indigo-600 animate-spin' : 'text-emerald-500 hover:text-emerald-600'}`} 
+                                title="Simpan ke Folder Google Drive Admin"
+                              >
+                                <CloudArrowUpIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => onDeleteRecord(record.id)} 
+                              className="p-1.5 text-slate-400 hover:text-rose-600" 
+                              title="Padam Rekod Penilaian"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredRecords.length === 0 && (
+                      <tr>
+                        <td colSpan={2} className="px-6 py-12 text-center text-slate-400 italic">
+                          Belum ada rekod penilaian bagi {currentDept}.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {effectiveTab === 'schedule' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
           <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
               <div>
-                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><CalendarDaysIcon className="h-6 w-6 text-indigo-600" /> Jadual Pemantauan</h3>
-                <p className="text-xs text-slate-400 font-bold mt-1 uppercase">Senarai sesi pemantauan akan datang</p>
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <CalendarDaysIcon className="h-6 w-6 text-indigo-600" /> 
+                  Pendaftaran & Jadual Pemantauan {isDeptView ? `(${currentDept})` : ''}
+                </h3>
+                <p className="text-xs text-slate-400 font-bold mt-1 uppercase">
+                  {isDeptView ? `Senarai sesi pemantauan bagi pensyarah ${currentDept} sahaja` : 'Senarai sesi pemantauan akan datang'}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2 w-full md:w-auto">
                 <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
                   <input type="checkbox" checked={onlyKJSchedule} onChange={e => setOnlyKJSchedule(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
                   <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
                 </label>
-                {(userRole === 'admin' || activeDepartments.length > 1) && (
+                {!isDeptView && (userRole === 'admin' || activeDepartments.length > 1) && (
                   <div className="relative">
                     <FunnelIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <select 
@@ -1295,7 +1720,7 @@ export const Dashboard: React.FC<Props> = ({
                   </div>
                 )}
                 <button onClick={() => handleNewSchedule()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-indigo-700 transition-all">
-                  + Daftar Jadual Baru
+                  + Daftar Jadual Baru {isDeptView ? `(${currentDept})` : ''}
                 </button>
               </div>
             </div>
@@ -1352,7 +1777,7 @@ export const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
-      {mainTab === 'summary' && !isRestricted && (
+      {!isDeptView && mainTab === 'summary' && !isRestricted && (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -1590,10 +2015,17 @@ export const Dashboard: React.FC<Props> = ({
             </div>
             <form onSubmit={handleScheduleSubmit} className="p-8 space-y-4">
               <select required value={schedForm.lecturerName} onChange={e => setSchedForm({...schedForm, lecturerName: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm shadow-inner">
-                <option value="" disabled>Pilih Pensyarah (Semua Jabatan)</option>
-                {allLecturers.sort((a,b) => a.name.localeCompare(b.name)).map(l => (
-                  <option key={l.name} value={l.name}>{l.name} ({l.department})</option>
-                ))}
+                <option value="" disabled>
+                  {isDeptView ? `Pilih Pensyarah (${currentDept})` : 'Pilih Pensyarah (Semua Jabatan)'}
+                </option>
+                {(isDeptView ? currentDeptLecturers : allLecturers)
+                  .sort((a,b) => a.name.localeCompare(b.name))
+                  .map(l => (
+                    <option key={l.name} value={l.name}>
+                      {l.name} {isDeptView ? '' : `(${l.department})`}
+                    </option>
+                  ))
+                }
               </select>
               <div className="grid grid-cols-2 gap-4">
                 <input required type="date" value={schedForm.date} onChange={e => setSchedForm({...schedForm, date: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
@@ -1643,8 +2075,8 @@ export const Dashboard: React.FC<Props> = ({
                   {!isOtherDept ? (
                     <select 
                       required
-                      disabled={!isAdminView}
-                      value={lecturerFormData.department}
+                      disabled={!isAdminView || isDeptView}
+                      value={isDeptView ? currentDept : lecturerFormData.department}
                       onChange={e => {
                         if (e.target.value === 'OTHER') {
                           setIsOtherDept(true);
@@ -1653,7 +2085,7 @@ export const Dashboard: React.FC<Props> = ({
                           setLecturerFormData({...lecturerFormData, department: e.target.value});
                         }
                       }}
-                      className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all appearance-none ${!isAdminView ? 'cursor-not-allowed opacity-70' : ''}`}
+                      className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all appearance-none ${(!isAdminView || isDeptView) ? 'cursor-not-allowed opacity-70' : ''}`}
                     >
                       <option value="" disabled>Pilih Jabatan</option>
                       {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}

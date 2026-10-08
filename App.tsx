@@ -669,10 +669,7 @@ const App: React.FC = () => {
     ? records 
     : isRestrictedUser 
       ? [] // Restricted user gets ZERO evaluation records
-      : records.filter(r => 
-          r.department === user?.department || 
-          (r.evaluatorName && user?.username && r.evaluatorName.toLowerCase().includes(user.username.toLowerCase()))
-        );
+      : records.filter(r => r.department === user?.department);
 
   const accessibleLecturers = (user?.role === 'admin' || user?.department === 'SEMUA')
     ? lecturersList 
@@ -812,7 +809,7 @@ const App: React.FC = () => {
             records={accessibleRecords} 
             schedules={accessibleSchedules}
             lecturers={accessibleLecturers}
-            allLecturers={lecturersList}
+            allLecturers={(user.role === 'admin' || user.department === 'SEMUA') ? lecturersList : accessibleLecturers}
             userRole={user.role}
             username={user.username}
             userDept={user.department}
