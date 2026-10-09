@@ -646,7 +646,7 @@ export const EvaluationForm: React.FC<Props> = ({
                 Pengesahan Tandatangan Digital (Kedua-dua Pihak)
               </h4>
               <p className="text-xs text-indigo-700/80 mt-0.5">
-                Kedua-dua tandatangan akan disimpan ke dalam rekod penilaian dan boleh disimpan ke profil untuk kegunaan seterusnya.
+                Setiap kotak tandatangan menyokong kedua-dua kaedah: tandatangan secara langsung menggunakan pen digital / skrin sentuh ATAU muat naik fail imej tandatangan.
               </p>
             </div>
             <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-indigo-200 shadow-sm shrink-0">
