@@ -731,15 +731,6 @@ export const Dashboard: React.FC<Props> = ({
               <ArrowPathIcon className="h-4 w-4 text-indigo-600 group-active:animate-spin" /> Kemaskini Data
             </button>
           )}
-          {isAdminView && onRestoreData && (
-            <button 
-              onClick={onRestoreData} 
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition-all shadow-sm"
-              title="Pulihkan dan selaraskan data 73 orang pensyarah yang telah dipantau pada 7.10.2026 (mengikut Supabase)"
-            >
-              <ArrowPathIcon className="h-4 w-4 text-emerald-600" /> Pulihkan Data (73 Pensyarah)
-            </button>
-          )}
           <button onClick={() => setShowGuideModal(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
             <InformationCircleIcon className="h-4 w-4 text-indigo-600" /> Panduan
           </button>

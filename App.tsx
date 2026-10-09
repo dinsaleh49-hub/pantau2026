@@ -1080,18 +1080,6 @@ const App: React.FC = () => {
                 </button>
               </div>
             )}
-            {user.role === 'admin' && (
-              <div className="flex items-center gap-2 mt-1">
-                <button 
-                  onClick={handleOpenRestoreConfirm}
-                  disabled={isSyncing}
-                  className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold transition-colors disabled:opacity-50 flex items-center gap-1 shadow-sm"
-                  title="Pulihkan dan selaraskan semula data 73 orang pensyarah yang telah dipantau pada 7.10.2026"
-                >
-                  <ArrowPathIcon className="h-3 w-3" /> Pulihkan Data Pemantauan (73 Pensyarah)
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </footer>
