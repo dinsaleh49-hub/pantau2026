@@ -358,4 +358,4 @@ export const EVALUATION_CRITERIA: Criterion[] = [
   { id: '6a', category: '6. Sahsiah', text: 'Pensyarah berusaha membina sahsiah guru yang penyayang, prihatin, penyabar dan bertanggungjawab.' },
 ];
 
-export const INITIAL_RECORDS: EvaluationRecord[] = [];
+export { INITIAL_RECORDS, INITIAL_SCHEDULES, INITIAL_SIGNATURES } from './initialData';

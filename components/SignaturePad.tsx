@@ -23,6 +23,18 @@ interface Props {
 
 type SignatureSource = 'initial' | 'saved' | 'uploaded' | 'drawn' | null;
 
+const getOptimizedCanvasDataUrl = (canvas: HTMLCanvasElement): string => {
+  try {
+    const webpUrl = canvas.toDataURL('image/webp', 0.85);
+    if (webpUrl && webpUrl.startsWith('data:image/webp')) {
+      return webpUrl;
+    }
+  } catch {
+    // fallback
+  }
+  return canvas.toDataURL('image/png');
+};
+
 export const SignaturePad: React.FC<Props> = ({ 
   label, 
   personName,
@@ -82,7 +94,7 @@ export const SignaturePad: React.FC<Props> = ({
       setHasSignature(true);
       setSigSource(source);
       userClearedRef.current = false;
-      const finalDataUrl = canvas.toDataURL('image/png');
+      const finalDataUrl = getOptimizedCanvasDataUrl(canvas);
       onSave(finalDataUrl);
 
       if (!silent) {
@@ -189,7 +201,7 @@ export const SignaturePad: React.FC<Props> = ({
 
     const canvas = canvasRef.current;
     if (canvas) {
-      const dataUrl = canvas.toDataURL('image/png');
+      const dataUrl = getOptimizedCanvasDataUrl(canvas);
       onSave(dataUrl);
       setHasSignature(true);
       setSigSource('drawn');
@@ -273,7 +285,7 @@ export const SignaturePad: React.FC<Props> = ({
   const handleSaveToLibraryClick = () => {
     const canvas = canvasRef.current;
     if (!canvas || !hasSignature) return;
-    const dataUrl = canvas.toDataURL('image/png');
+    const dataUrl = getOptimizedCanvasDataUrl(canvas);
     if (onSaveToLibrary) {
       onSaveToLibrary(dataUrl);
       setSigSource('saved');

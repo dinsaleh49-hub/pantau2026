@@ -50,7 +50,8 @@ import {
   ArchiveBoxArrowDownIcon,
   HandThumbUpIcon,
   ExclamationCircleIcon,
-  UserPlusIcon
+  UserPlusIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
 import { generatePDF, generateSummaryPDF, generateFullDepartmentPDF } from '../services/pdfService';
 import { uploadToGoogleDrive } from '../services/googleDriveService';
@@ -73,9 +74,11 @@ interface Props {
   onAddLecturer: (lecturer: { name: string; department: string }) => void;
   onUpdateLecturer: (oldName: string, oldDept: string, updatedLecturer: { name: string; department: string }) => void;
   onRefresh?: () => void;
+  onRestoreData?: () => void;
   lastSync?: Date | null;
   userDept?: string;
   isRestrictedUser?: boolean;
+  onStartEvaluation?: (preset?: { lecturerName?: string; department?: string; course?: string; code?: string; date?: string }) => void;
 }
 
 const DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1I5-K1Yv3SnFMBzUQtQnPzR82AeHWJqNw?usp=sharing";
@@ -105,8 +108,10 @@ export const Dashboard: React.FC<Props> = ({
   onAddLecturer,
   onUpdateLecturer,
   onRefresh,
+  onRestoreData,
   lastSync,
-  isRestrictedUser
+  isRestrictedUser,
+  onStartEvaluation
 }) => {
   const isRestricted = !!isRestrictedUser || (username?.toLowerCase() === 'pensyarah' && userRole === 'user');
   const isAdminView = userRole === 'admin';
@@ -135,6 +140,7 @@ export const Dashboard: React.FC<Props> = ({
   const [selectedLecturerHistory, setSelectedLecturerHistory] = useState<{ name: string; records: EvaluationRecord[] } | null>(null);
   const [analysisDeptFilter, setAnalysisDeptFilter] = useState<string>('all');
   const [onlyKJ, setOnlyKJ] = useState(false);
+  const [monitoringStatusFilter, setMonitoringStatusFilter] = useState<'all' | 'monitored' | 'unmonitored'>('all');
   const [onlyKJRecords, setOnlyKJRecords] = useState(false);
   const [onlyKJSchedule, setOnlyKJSchedule] = useState(false);
   
@@ -220,7 +226,7 @@ export const Dashboard: React.FC<Props> = ({
     return allLecturers.filter(l => !LECTURERS.some(staticL => staticL.name.toLowerCase() === l.name.toLowerCase()));
   }, [allLecturers]);
 
-  const monitoringStatus = useMemo(() => {
+  const allMonitoringStatus = useMemo(() => {
     const baseList = isDeptView ? currentDeptLecturers : lecturers;
     const filterDept = isDeptView ? currentDept : selectedDeptFilter;
     const recordsSource = isDeptView ? currentDeptRecords : records;
@@ -228,7 +234,6 @@ export const Dashboard: React.FC<Props> = ({
     return baseList
       .filter(l => filterDept === 'all' || l.department === filterDept)
       .filter(l => !onlyKJ || l.name.includes('(KJ)'))
-      .filter(l => l.name.toLowerCase().includes(statusSearchTerm.toLowerCase()))
       .map(lec => {
         const lecturerRecords = recordsSource.filter(r => 
           r.lecturerName.toLowerCase() === lec.name.toLowerCase() && 
@@ -256,9 +261,21 @@ export const Dashboard: React.FC<Props> = ({
           latestRecord: latestRecord,
           allRecords: lecturerRecords.sort((a, b) => b.timestamp - a.timestamp)
         };
+      });
+  }, [records, lecturers, currentDeptLecturers, currentDeptRecords, selectedDeptFilter, onlyKJ, isDeptView, currentDept]);
+
+  const monitoredLecturersCount = useMemo(() => allMonitoringStatus.filter(i => i.isMonitored).length, [allMonitoringStatus]);
+  const unmonitoredLecturersCount = useMemo(() => allMonitoringStatus.filter(i => !i.isMonitored).length, [allMonitoringStatus]);
+
+  const monitoringStatus = useMemo(() => {
+    return allMonitoringStatus
+      .filter(item => {
+        if (monitoringStatusFilter === 'monitored') return item.isMonitored;
+        if (monitoringStatusFilter === 'unmonitored') return !item.isMonitored;
+        return true;
       })
       .filter(item => item.name.toLowerCase().includes(statusSearchTerm.toLowerCase()));
-  }, [records, lecturers, currentDeptLecturers, currentDeptRecords, statusSearchTerm, selectedDeptFilter, onlyKJ, isDeptView, currentDept]);
+  }, [allMonitoringStatus, monitoringStatusFilter, statusSearchTerm]);
 
   const unmonitoredLecturersOverall = useMemo(() => {
     return allLecturers.filter(l => !records.some(r => 
@@ -714,9 +731,27 @@ export const Dashboard: React.FC<Props> = ({
               <ArrowPathIcon className="h-4 w-4 text-indigo-600 group-active:animate-spin" /> Kemaskini Data
             </button>
           )}
+          {isAdminView && onRestoreData && (
+            <button 
+              onClick={onRestoreData} 
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition-all shadow-sm"
+              title="Pulihkan dan selaraskan data 73 orang pensyarah yang telah dipantau pada 7.10.2026 (mengikut Supabase)"
+            >
+              <ArrowPathIcon className="h-4 w-4 text-emerald-600" /> Pulihkan Data (73 Pensyarah)
+            </button>
+          )}
           <button onClick={() => setShowGuideModal(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
             <InformationCircleIcon className="h-4 w-4 text-indigo-600" /> Panduan
           </button>
+          {!isRestricted && onStartEvaluation && (
+            <button 
+              onClick={() => onStartEvaluation({ department: isDeptView ? currentDept : undefined })} 
+              className="flex items-center gap-2 px-4 py-2 bg-rose-600 rounded-xl text-sm font-bold text-white hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 active:scale-95"
+              title="Mula sesi penilaian untuk pensyarah"
+            >
+              <ClipboardDocumentCheckIcon className="h-4 w-4" /> Nilai Pensyarah {isDeptView ? `(${currentDept})` : ''}
+            </button>
+          )}
           <button onClick={() => handleNewSchedule()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 rounded-xl text-sm font-bold text-white hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
             <CalendarIcon className="h-4 w-4" /> Daftar Jadual {isDeptView ? `(${currentDept})` : ''}
           </button>
@@ -1268,7 +1303,34 @@ export const Dashboard: React.FC<Props> = ({
                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><UsersIcon className="h-6 w-6 text-indigo-600" /> Pengurusan Pensyarah</h3>
                 <p className="text-xs text-slate-400 font-bold mt-1 uppercase">Semakan status pemantauan pensyarah mengikut jabatan</p>
               </div>
-              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+              <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
+                {/* Status Filter Pills */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button 
+                    type="button"
+                    onClick={() => setMonitoringStatusFilter('all')} 
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${monitoringStatusFilter === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    Semua ({allMonitoringStatus.length})
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setMonitoringStatusFilter('monitored')} 
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${monitoringStatusFilter === 'monitored' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-700 hover:bg-emerald-50'}`}
+                    title="Paparkan hanya rekod pensyarah yang telah dipantau"
+                  >
+                    <CheckBadgeIcon className="h-3.5 w-3.5" /> Telah Dipantau ({monitoredLecturersCount})
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setMonitoringStatusFilter('unmonitored')} 
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${monitoringStatusFilter === 'unmonitored' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-700 hover:bg-rose-50'}`}
+                    title="Paparkan pensyarah yang belum dipantau"
+                  >
+                    Belum ({unmonitoredLecturersCount})
+                  </button>
+                </div>
+
                 <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
                   <input type="checkbox" checked={onlyKJ} onChange={e => setOnlyKJ(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
                   <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
@@ -1373,6 +1435,15 @@ export const Dashboard: React.FC<Props> = ({
                            </>
                          )}
                          <button onClick={() => handleNewSchedule(item.name)} className="p-1.5 text-indigo-500" title="Daftar Jadual"><CalendarIcon className="h-4 w-4" /></button>
+                         {!isRestricted && onStartEvaluation && (
+                           <button 
+                             onClick={() => onStartEvaluation({ lecturerName: item.name, department: item.department })} 
+                             className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold shadow-sm transition-all active:scale-95" 
+                             title={`Mula Sesi Penilaian untuk ${item.name}`}
+                           >
+                             <ClipboardDocumentCheckIcon className="h-3 w-3" /> Nilai
+                           </button>
+                         )}
                          {(isAdminView || canEdit) && (
                            <button 
                              onClick={() => onDeleteLecturer(item.name, item.department)} 
@@ -1486,7 +1557,34 @@ export const Dashboard: React.FC<Props> = ({
                   Semakan status pemantauan bagi semua pensyarah di {currentDept} sahaja
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+              <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
+                {/* Status Filter Pills */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button 
+                    type="button"
+                    onClick={() => setMonitoringStatusFilter('all')} 
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${monitoringStatusFilter === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    Semua ({allMonitoringStatus.length})
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setMonitoringStatusFilter('monitored')} 
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${monitoringStatusFilter === 'monitored' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-700 hover:bg-emerald-50'}`}
+                    title="Paparkan hanya rekod pensyarah jabatan ini yang telah dipantau"
+                  >
+                    <CheckBadgeIcon className="h-3.5 w-3.5" /> Telah Dipantau ({monitoredLecturersCount})
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setMonitoringStatusFilter('unmonitored')} 
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${monitoringStatusFilter === 'unmonitored' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-700 hover:bg-rose-50'}`}
+                    title="Paparkan pensyarah yang belum dipantau"
+                  >
+                    Belum ({unmonitoredLecturersCount})
+                  </button>
+                </div>
+
                 <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
                   <input type="checkbox" checked={onlyKJ} onChange={e => setOnlyKJ(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
                   <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
@@ -1575,6 +1673,15 @@ export const Dashboard: React.FC<Props> = ({
                                 <ArrowDownTrayIcon className="h-3 w-3" /> Muat Turun
                               </button>
                             </>
+                          )}
+                          {!isRestricted && onStartEvaluation && (
+                            <button 
+                              onClick={() => onStartEvaluation({ lecturerName: item.name, department: item.department })} 
+                              className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold shadow-sm transition-all active:scale-95" 
+                              title={`Mula Sesi Penilaian untuk ${item.name}`}
+                            >
+                              <ClipboardDocumentCheckIcon className="h-3 w-3" /> Nilai
+                            </button>
                           )}
                           <button onClick={() => handleNewSchedule(item.name)} className="flex items-center gap-1 px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded text-[10px] font-bold hover:bg-indigo-100" title="Daftar Jadual untuk pensyarah ini">
                             <CalendarIcon className="h-3 w-3" /> Jadual
@@ -1765,6 +1872,21 @@ export const Dashboard: React.FC<Props> = ({
                       <span>{s.location}</span>
                     </div>
                   </div>
+                  {!isRestricted && onStartEvaluation && (
+                    <button 
+                      onClick={() => onStartEvaluation({ 
+                        lecturerName: s.lecturerName, 
+                        department: s.department, 
+                        course: s.course, 
+                        code: s.code, 
+                        date: s.date 
+                      })}
+                      className="w-full mt-4 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95"
+                      title={`Mula Menilai ${s.lecturerName} untuk kursus ${s.code}`}
+                    >
+                      <ClipboardDocumentCheckIcon className="h-4 w-4" /> Nilai Sesi Ini Sekarang
+                    </button>
+                  )}
                 </div>
               )) : (
                 <div className="col-span-full py-20 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">

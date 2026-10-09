@@ -1,0 +1,526 @@
+[
+  {
+    "name": "Adzli bin Ismail (KJ)",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Ablin a/p Davadason Peter",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Afian Akhbar bin Mustam",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Ameerul Aswad bin Ab Aziz",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Anida binti Idrus",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Aniza binti Omar",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Azhar bin Hashim (KJ)",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Azlin binti Mohd Rosdi",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Azlina binti Yacob",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Azlina Wati binti Hamdan",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Bahiyah binti A Talip",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Che Rohani binti Che Aziz",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Datin Noor Akmar binti Azlan",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Dg Bibah binti Ag Tuah",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Dr. Abd.Hadi bin Kudin (KJ)",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Dr. Adila binti Md. Hashim",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Dr. Ajurun Begum binti Ahamed (KJ)",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Dr. Anusuya a/p Kaliappan",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Dr. Asmah binti Bohari (KJ)",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Dr. Asmah binti Mat Sa ud",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Dr. Azerai bin Azmi",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Baharudin bin Saleh",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Ellyza binti Karim (KJ)",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Fauziah binti Ismail",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Dr. Gayatri a/p Marimothu",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Dr. Khasturi a/p Ramalingam",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Kok Boon Shiong",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Dr. Kwan Shwu Shyan",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Dr. Loh Su Ling",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Dr. Mohammad Izzuan bin Termedi @Termiji",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Dr. Mohd Ridzuan bin Padzil",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Dr. Mohd Sukri bin Ma arof",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Muhd Fariz bin Ismail (KJ)",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Noor Haslinda binti Shuib",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Nor Laila binti Md Zain",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Dr. Nur Munirah binti Kamaruzaman",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Rubiah binti Dalail",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Santhi a/p Letchumanan",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Dr. Shamila Dewi a/p Davadas",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Dr. Shamsul Nizam bin Kachi Mohideen",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Dr. Shanty binti Sai en (KJ)",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Dr. Shasitharan a/l Raman Kutty",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Dr. Siti Rahayu binti Muhammad",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Dr. Suraya Hani binti Zakaria",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Syakima Ilyana binti Ibrahim",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Dr. Syamsiah binti Mokhtar",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Dr. Tengku Nor Husna binti Tengku Jamil (KJ)",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Dr. Thiru Kali Thevi a/p A.Jayaraman",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Dr. Vadivelan a/l Lohonathan",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Dr. Vani a/p Perumal",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Dr. Zaitun binti Ghazali (KJ)",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Dr. Zurina binti Mustaffa",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Faridah binti Mohamad Saad",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Fauziah binti Ahmad@ Muhd Zailani",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Fawarni binti Ahmad",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Govindan a/l Kanapathy",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Gurumintarjit Kaur a/p Jangir Singh (KJ)",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Hanafi bin Khamis",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Hapidah binti Ab Razak",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Haslinah binti Abdullah",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Hemalatha a/p Ramaya@ Durairajoo",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Isharae bin Abdul Mosamad",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Jaya Murugan a/l Chandran",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "K. Raja a/l M. Kanapathy",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Kamal bin Baharom",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Kamalularifin bin Muhamed",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Khairullah bin Mokhtar",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Lee Kim Hong",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Lokman Hakim bin Muhammed",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Maheskumar a/l Krishnan",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Mahidin bin Awang Itam",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Manisah binti Mohd Shah",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Maznah @ Azmah binti Mersin",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Meor Aris bin Meor Hamzah",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Mohamad Raffe bin Ghalil Abbas",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Mohamed Shariff bin Salehuadin",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Mohammad Effandi bin Othman",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Mohd Asri bin Abdul Aziz",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Mohd Fitri Firdauz bin Mohd Nor",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Mohd Huzaifah bin Abdul Rahman",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Mohd Kashfi bin Mohd Jailani",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Mohd Nizam bin Ijom",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Mohd Syafiq bin Abu Hanipah",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Mohd Tazli bin Mahat",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Mohd Zainal Abidin bin Che Mood",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Mohd. Amin bin Said",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Muhammad bin Ibrahim",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Muhammad Hilal bin Arshad",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Noor Aqilah binti Abdul Latiff Janaton",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Noor Aziah binti Mohd Noor",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Noor Marlina binti Mohamed Nor",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Noraziah binti Mhd Yusop",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Norimah binti Mohd Salleh",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Norliha binti Jemain",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Norsida binti Ibrahim",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Norsyazana binti Kamarudin",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Norsyazwani binti Muhamad Dah",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Norzeha binti Othman",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Nur Fatihathul Amin binti Abdul Aziz",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Nur Rashidah Khairunnisa Ranjeeta binti Abdullah",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Rabi ah binti Abd. Rahman",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Ramli bin Setapa",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Reshma a/p Rajasaigran",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Roziah binti Anuar",
+    "department": "Jabatan Sains"
+  },
+  {
+    "name": "Ruba ie bin Said",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Sarimah binti Mokhtar",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Sh. Nabilatul Huda binti Syed Abdullah",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Shaharudin bin Saad",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Shamsharizal bin Abd Aziz (KJ)",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Sharon Vijaya a/p Balakrishnan",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Sheela Devi a/p Veerasamy",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Sohaini binti Rejab",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Su Yit Mun",
+    "department": "Jabatan Bahasa"
+  },
+  {
+    "name": "Suzana binti Harun (KJ)",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Tan Sok Phiaw",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Tan Soo Hun",
+    "department": "Jabatan Sains Sosial"
+  },
+  {
+    "name": "Ts. Dr. Mohamed Nazul bin Ismail (KJ)",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Ts. Dr. Nur Ain binti Baharin",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Ts. En. Khu Eian Chun",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Vilashini a/p Alagandaran",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Wahadatul Arta iah binti Saaudi",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Wan Amalia binti Wan Sulaiman (KJ)",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Wan Nur Fuziana binti Abdol Jani",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Wan Salsa Biila binti Wan Norudin",
+    "department": "Jabatan Pendidikan Islam"
+  },
+  {
+    "name": "Zamry bin Ibrahim",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  },
+  {
+    "name": "Zanariah binti Mohd Idris",
+    "department": "Jabatan Matematik"
+  },
+  {
+    "name": "Zanariah binti Sipon",
+    "department": "Jabatan Ilmu Pendidikan"
+  },
+  {
+    "name": "Zanariah binti Wahab",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Zawiah binti Bahrom",
+    "department": "Jabatan Pengajian Melayu"
+  },
+  {
+    "name": "Zolkeple bin Ibrahim",
+    "department": "Jabatan Pendidikan Jasmani dan Kokurikulum"
+  },
+  {
+    "name": "Zul Azmi bin Mokhlas",
+    "department": "Jabatan Pendidikan Teknik dan Vokasional"
+  }
+]

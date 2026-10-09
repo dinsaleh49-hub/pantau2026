@@ -91,12 +91,26 @@ export const EvaluationForm: React.FC<Props> = ({
       const isKnownEvaluator = EVALUATORS.includes(initialData.evaluatorName);
       setIsOtherEvaluator(!isKnownEvaluator && !!initialData.evaluatorName);
 
-      setScores(initialData.scores);
-      setItemRemarks(initialData.itemRemarks);
+      setScores(initialData.scores || {});
+      setItemRemarks(initialData.itemRemarks || {});
       if (initialData.lecturerSignature) setLecturerSig(initialData.lecturerSignature);
       if (initialData.evaluatorSignature) setEvaluatorSig(initialData.evaluatorSignature);
     }
   }, [initialData]);
+
+  // Auto-populate saved signature for evaluator if available
+  useEffect(() => {
+    if (!evaluatorSig && formData.evaluatorName?.trim() && savedSignatures[formData.evaluatorName.trim()]) {
+      setEvaluatorSig(savedSignatures[formData.evaluatorName.trim()]);
+    }
+  }, [formData.evaluatorName, savedSignatures, evaluatorSig]);
+
+  // Auto-populate saved signature for lecturer if available
+  useEffect(() => {
+    if (!lecturerSig && formData.lecturerName?.trim() && savedSignatures[formData.lecturerName.trim()]) {
+      setLecturerSig(savedSignatures[formData.lecturerName.trim()]);
+    }
+  }, [formData.lecturerName, savedSignatures, lecturerSig]);
 
   const handleLecturerChange = (name: string) => {
     // Try to find a lecturer that matches both name and CURRENT department first
@@ -166,15 +180,44 @@ export const EvaluationForm: React.FC<Props> = ({
     setItemRemarks((prev) => ({ ...prev, [id]: remark }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("[EvaluationForm] handleSubmit called");
-    
+  const handleQuickFillScores = (val: number) => {
+    const updated: Record<string, number> = {};
+    EVALUATION_CRITERIA.forEach(c => {
+      updated[c.id] = val;
+    });
+    setScores(updated);
+    if (onNotification) {
+      onNotification(`Semua ${EVALUATION_CRITERIA.length} kriteria penilaian telah diisi dengan skor ${val}.`, 'success');
+    }
+  };
+
+  const handleClearScores = () => {
+    setScores({});
+    if (onNotification) {
+      onNotification('Semua skor kriteria telah dikosongkan.', 'error');
+    }
+  };
+
+  const executeSave = async (isDraft: boolean = false) => {
+    if (!formData.lecturerName.trim()) {
+      if (onNotification) {
+        onNotification('Sila pilih atau masukkan nama pensyarah sebelum menyimpan.', 'error');
+      }
+      return;
+    }
+
+    if (!formData.department.trim()) {
+      if (onNotification) {
+        onNotification('Sila pilih jabatan pensyarah sebelum menyimpan.', 'error');
+      }
+      return;
+    }
+
     const missingCriteria = EVALUATION_CRITERIA.filter(c => !scores[c.id]);
-    if (missingCriteria.length > 0) {
+    if (!isDraft && missingCriteria.length > 0) {
       const firstMissing = missingCriteria[0];
       if (onNotification) {
-        onNotification(`Sila lengkapkan semua kriteria penilaian. Sila semak kriteria ${firstMissing.id}`, 'error');
+        onNotification(`Sila lengkapkan semua kriteria penilaian (${missingCriteria.length} belum dinilai, cth: ${firstMissing.id}), atau klik "Simpan Draf".`, 'error');
       }
       // Scroll to the first missing criterion
       const element = document.getElementById(`criterion-${firstMissing.id}`);
@@ -182,15 +225,6 @@ export const EvaluationForm: React.FC<Props> = ({
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         element.classList.add('ring-2', 'ring-red-500', 'ring-offset-2');
         setTimeout(() => element.classList.remove('ring-2', 'ring-red-500', 'ring-offset-2'), 3000);
-      }
-      return;
-    }
-
-    if (!lecturerSig || !evaluatorSig) {
-      if (onNotification) {
-        onNotification('Sila pastikan kedua-dua pihak (Pensyarah & Pemantau) telah menurunkan tandatangan digital.', 'error');
-      } else {
-        alert('Sila pastikan kedua-dua pihak telah menurunkan tandatangan digital.');
       }
       return;
     }
@@ -218,19 +252,21 @@ export const EvaluationForm: React.FC<Props> = ({
     
     setIsSubmitting(true);
     
-    // Use a small delay for better UX feedback, then await the submission
-    setTimeout(async () => {
-      try {
-        await onSubmit(record);
-      } catch (error) {
-        console.error("Error in onSubmit:", error);
-        if (onNotification) {
-          onNotification('Ralat semasa menyimpan rekod.', 'error');
-        }
-      } finally {
-        setIsSubmitting(false);
+    try {
+      await onSubmit(record);
+    } catch (error) {
+      console.error("Error in onSubmit:", error);
+      if (onNotification) {
+        onNotification('Ralat semasa menyimpan rekod.', 'error');
       }
-    }, 800);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeSave(false);
   };
 
   const handleViewPDF = () => {
@@ -468,6 +504,74 @@ export const EvaluationForm: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* Quick Scoring Toolbar and Completion Status */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-700">Kemajuan Penilaian Kriteria:</span>
+              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                EVALUATION_CRITERIA.filter(c => !!scores[c.id]).length === EVALUATION_CRITERIA.length 
+                  ? 'bg-emerald-100 text-emerald-800' 
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {EVALUATION_CRITERIA.filter(c => !!scores[c.id]).length} / {EVALUATION_CRITERIA.length} Kriteria
+              </span>
+              {Object.keys(scores).length > 0 && (
+                <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                  Purata Skor Semasa: {(Object.values(scores).reduce((a, b) => a + b, 0) / Object.keys(scores).length).toFixed(2)}
+                </span>
+              )}
+            </div>
+            <div className="w-full sm:w-80 bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
+              <div 
+                className="bg-indigo-600 h-full transition-all duration-300"
+                style={{ width: `${(EVALUATION_CRITERIA.filter(c => !!scores[c.id]).length / EVALUATION_CRITERIA.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-500">Isi Pantas:</span>
+            <button 
+              type="button" 
+              onClick={() => handleQuickFillScores(4)}
+              className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+              title="Isi semua kriteria dengan skor 4 (Baik)"
+            >
+              Semua Skor 4
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleQuickFillScores(5)}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+              title="Isi semua kriteria dengan skor 5 (Cemerlang)"
+            >
+              Semua Skor 5
+            </button>
+            {Object.keys(scores).length > 0 && (
+              <button 
+                type="button" 
+                onClick={handleClearScores}
+                className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-bold transition-all"
+                title="Kosongkan semua skor"
+              >
+                Kosongkan
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => executeSave(true)}
+              disabled={isSubmitting}
+              className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-black transition-all shadow-sm active:scale-95 flex items-center gap-1"
+              title="Simpan draf penilaian ini pada bila-bila masa agar tidak hilang"
+            >
+              💾 Simpan Draf
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-8">
         {Object.entries(groupedCriteria).map(([category, criteria]) => {
           const { num, title } = parseCategory(category);
@@ -600,9 +704,18 @@ export const EvaluationForm: React.FC<Props> = ({
           <button 
             type="button" 
             onClick={handleViewPDF}
-            className="w-full sm:w-auto bg-white border border-indigo-600 text-indigo-600 px-8 py-3.5 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-sm text-sm"
+            className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 px-6 py-3.5 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm text-sm"
           >
             Lihat PDF
+          </button>
+          <button 
+            type="button" 
+            onClick={() => executeSave(true)}
+            disabled={isSubmitting}
+            className="w-full sm:w-auto bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 px-6 py-3.5 rounded-xl font-black transition-all shadow-sm text-sm active:scale-95 flex items-center justify-center gap-1.5"
+            title="Simpan data penilaian ini sebagai draf pada bila-bila masa"
+          >
+            <span>💾</span> Simpan Sebagai Draf
           </button>
           <button 
             type="submit" 
@@ -612,7 +725,7 @@ export const EvaluationForm: React.FC<Props> = ({
             {isSubmitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Menyimpan Perubahan...
+                Menyimpan Rekod...
               </>
             ) : (
               <>
