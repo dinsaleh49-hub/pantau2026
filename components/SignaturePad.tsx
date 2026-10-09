@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { 
   ArrowUpTrayIcon, 
   TrashIcon, 
-  BookmarkSquareIcon, 
   CheckCircleIcon,
   SparklesIcon,
   PencilSquareIcon,
@@ -104,10 +103,13 @@ export const SignaturePad: React.FC<Props> = ({
       userClearedRef.current = false;
       const finalDataUrl = getOptimizedCanvasDataUrl(canvas);
       onSave(finalDataUrl);
+      if (onSaveToLibrary) {
+        onSaveToLibrary(finalDataUrl);
+      }
 
       if (!silent) {
         if (source === 'uploaded') {
-          showFeedback('Tandatangan imej berjaya dimuat naik & sedia digunakan!', 'success');
+          showFeedback('Tandatangan imej berjaya dimuat naik & disimpan!', 'success');
         } else if (source === 'saved') {
           showFeedback('Tandatangan profil berjaya dimuatkan!', 'success');
         } else {
@@ -121,7 +123,7 @@ export const SignaturePad: React.FC<Props> = ({
     };
 
     img.src = dataUrl;
-  }, [onSave]);
+  }, [onSave, onSaveToLibrary]);
 
   // Reset cleared state when target person changes
   useEffect(() => {
@@ -210,6 +212,9 @@ export const SignaturePad: React.FC<Props> = ({
     if (canvas) {
       const dataUrl = getOptimizedCanvasDataUrl(canvas);
       onSave(dataUrl);
+      if (onSaveToLibrary) {
+        onSaveToLibrary(dataUrl);
+      }
       setHasSignature(true);
       setSigSource('drawn');
     }
@@ -289,17 +294,6 @@ export const SignaturePad: React.FC<Props> = ({
     }
   };
 
-  const handleSaveToLibraryClick = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !hasSignature) return;
-    const dataUrl = getOptimizedCanvasDataUrl(canvas);
-    if (onSaveToLibrary) {
-      onSaveToLibrary(dataUrl);
-      setSigSource('saved');
-      showFeedback('Tandatangan ini berjaya disimpan ke profil!', 'success');
-    }
-  };
-
   const handleDeleteSavedClick = () => {
     if (onDeleteFromLibrary) {
       onDeleteFromLibrary();
@@ -348,7 +342,7 @@ export const SignaturePad: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Global Signature Actions: Guna Profil, Simpan Profil, Padam */}
+        {/* Global Signature Actions: Guna Profil, Padam */}
         <div className="flex items-center flex-wrap gap-1.5">
           {savedSignature && (
             <button
@@ -359,18 +353,6 @@ export const SignaturePad: React.FC<Props> = ({
             >
               <SparklesIcon className="w-3.5 h-3.5 text-amber-600" />
               Guna Profil
-            </button>
-          )}
-
-          {hasSignature && onSaveToLibrary && (
-            <button
-              type="button"
-              onClick={handleSaveToLibraryClick}
-              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-lg border border-emerald-300 transition-all flex items-center gap-1 shadow-sm active:scale-95"
-              title="Simpan tandatangan ini ke profil untuk kegunaan borang seterusnya"
-            >
-              <BookmarkSquareIcon className="w-3.5 h-3.5 text-emerald-600" />
-              Simpan Profil
             </button>
           )}
 

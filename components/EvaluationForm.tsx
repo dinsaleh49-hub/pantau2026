@@ -59,7 +59,6 @@ export const EvaluationForm: React.FC<Props> = ({
   const [itemRemarks, setItemRemarks] = useState<Record<string, string>>({});
   const [lecturerSig, setLecturerSig] = useState<string>('');
   const [evaluatorSig, setEvaluatorSig] = useState<string>('');
-  const [autoSaveSignatures, setAutoSaveSignatures] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -229,8 +228,8 @@ export const EvaluationForm: React.FC<Props> = ({
       return;
     }
 
-    // Auto-save signatures to library if checked
-    if (autoSaveSignatures && onSaveSignature) {
+    // Auto-save signatures to library
+    if (onSaveSignature) {
       if (formData.lecturerName.trim() && lecturerSig) {
         onSaveSignature(formData.lecturerName.trim(), lecturerSig);
       }
@@ -639,34 +638,16 @@ export const EvaluationForm: React.FC<Props> = ({
         </div>
 
         <div className="space-y-4 pt-2 border-t border-slate-100">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-indigo-50/60 p-4 rounded-2xl border border-indigo-100">
-            <div>
-              <h4 className="text-sm font-black text-indigo-900 flex items-center gap-2">
-                <SparklesIcon className="h-4 w-4 text-indigo-600" />
-                Pengesahan Tandatangan Digital (Kedua-dua Pihak)
-              </h4>
-              <p className="text-xs text-indigo-700/80 mt-0.5">
-                Setiap kotak tandatangan menyokong kedua-dua kaedah: tandatangan secara langsung menggunakan pen digital / skrin sentuh ATAU muat naik fail imej tandatangan.
-              </p>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-indigo-200 shadow-sm shrink-0">
-              <input 
-                type="checkbox" 
-                checked={autoSaveSignatures} 
-                onChange={e => setAutoSaveSignatures(e.target.checked)}
-                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-              />
-              <span className="text-[11px] font-bold text-slate-700">
-                Simpan ke Profil (Auto-Save)
-              </span>
-            </label>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <SignaturePad 
               label="Tandatangan Pensyarah" 
               personName={formData.lecturerName}
-              onSave={(data) => setLecturerSig(data)}
+              onSave={(data) => {
+                setLecturerSig(data);
+                if (data && formData.lecturerName.trim() && onSaveSignature) {
+                  onSaveSignature(formData.lecturerName.trim(), data);
+                }
+              }}
               onClear={() => setLecturerSig('')}
               initialSignature={initialData?.lecturerSignature}
               savedSignature={savedSignatures[formData.lecturerName.trim()]}
@@ -676,7 +657,12 @@ export const EvaluationForm: React.FC<Props> = ({
             <SignaturePad 
               label="Tandatangan Pemantau" 
               personName={formData.evaluatorName}
-              onSave={(data) => setEvaluatorSig(data)}
+              onSave={(data) => {
+                setEvaluatorSig(data);
+                if (data && formData.evaluatorName.trim() && onSaveSignature) {
+                  onSaveSignature(formData.evaluatorName.trim(), data);
+                }
+              }}
               onClear={() => setEvaluatorSig('')}
               initialSignature={initialData?.evaluatorSignature}
               savedSignature={savedSignatures[formData.evaluatorName.trim()]}
