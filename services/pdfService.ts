@@ -220,18 +220,29 @@ export const generatePDF = (record: EvaluationRecord, action: 'save' | 'view' | 
 
   doc.setFontSize(8.5);
 
+  const getSigFormat = (dataUrl: string) => {
+    if (!dataUrl) return 'PNG';
+    if (dataUrl.includes('image/jpeg') || dataUrl.includes('image/jpg')) return 'JPEG';
+    if (dataUrl.includes('image/webp')) return 'WEBP';
+    return 'PNG';
+  };
+
   // --- DISPLAY SIGNATURES ---
-  if (record.lecturerSignature) {
+  if (record.lecturerSignature && record.lecturerSignature.trim()) {
     try {
-      doc.addImage(record.lecturerSignature, 'PNG', margin + 10, blockStartY + 38, 35, 12);
+      doc.setFillColor(255, 255, 255);
+      doc.rect(margin + 8, blockStartY + 36, 40, 16, 'F');
+      doc.addImage(record.lecturerSignature, getSigFormat(record.lecturerSignature), margin + 10, blockStartY + 37, 36, 14);
     } catch (e) {
       console.warn('Lecturer signature display failed', e);
     }
   }
 
-  if (record.evaluatorSignature) {
+  if (record.evaluatorSignature && record.evaluatorSignature.trim()) {
     try {
-      doc.addImage(record.evaluatorSignature, 'PNG', pageWidth / 2 + 10, blockStartY + 38, 35, 12);
+      doc.setFillColor(255, 255, 255);
+      doc.rect(pageWidth / 2 + 8, blockStartY + 36, 40, 16, 'F');
+      doc.addImage(record.evaluatorSignature, getSigFormat(record.evaluatorSignature), pageWidth / 2 + 10, blockStartY + 37, 36, 14);
     } catch (e) {
       console.warn('Evaluator signature display failed', e);
     }

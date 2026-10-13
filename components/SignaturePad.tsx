@@ -3,10 +3,10 @@ import {
   ArrowUpTrayIcon, 
   TrashIcon, 
   CheckCircleIcon,
-  SparklesIcon,
   PencilSquareIcon,
   PhotoIcon,
-  DocumentArrowUpIcon
+  DocumentArrowUpIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 interface Props {
@@ -22,14 +22,20 @@ interface Props {
 
 type SignatureSource = 'initial' | 'saved' | 'uploaded' | 'drawn' | null;
 
+/**
+ * Exports canvas content as a crisp PNG with a guaranteed pure white background.
+ * This completely prevents transparent alpha channels from turning into black boxes in jsPDF or previews.
+ */
 const getOptimizedCanvasDataUrl = (canvas: HTMLCanvasElement): string => {
-  try {
-    const webpUrl = canvas.toDataURL('image/webp', 0.85);
-    if (webpUrl && webpUrl.startsWith('data:image/webp')) {
-      return webpUrl;
-    }
-  } catch {
-    // fallback to png
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = canvas.width;
+  offCanvas.height = canvas.height;
+  const offCtx = offCanvas.getContext('2d');
+  if (offCtx) {
+    offCtx.fillStyle = '#ffffff';
+    offCtx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+    offCtx.drawImage(canvas, 0, 0);
+    return offCanvas.toDataURL('image/png');
   }
   return canvas.toDataURL('image/png');
 };
@@ -41,8 +47,7 @@ export const SignaturePad: React.FC<Props> = ({
   savedSignature,
   onSave, 
   onClear,
-  onSaveToLibrary,
-  onDeleteFromLibrary
+  onSaveToLibrary
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,8 +55,8 @@ export const SignaturePad: React.FC<Props> = ({
   // Mode selection: 'pen' (Tandatangan Guna Pen) or 'upload' (Muat Naik Tandatangan)
   const [activeMode, setActiveMode] = useState<'pen' | 'upload'>('pen');
   
-  // Pen configuration
-  const [penColor, setPenColor] = useState<string>('#0f172a'); // default black/slate
+  // Pen configuration: Default royal blue ink (standard official academic signature)
+  const [penColor, setPenColor] = useState<string>('#1e3a8a'); 
   const [penWidth, setPenWidth] = useState<number>(2.5); // default medium
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -67,8 +72,16 @@ export const SignaturePad: React.FC<Props> = ({
 
   const showFeedback = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setFeedback({ message, type });
-    setTimeout(() => setFeedback(null), 3500);
+    setTimeout(() => setFeedback(null), 3000);
   };
+
+  // Helper to fill canvas with white background
+  const clearCanvasWithWhite = useCallback((canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
 
   const drawImageToCanvas = useCallback((dataUrl: string, source: 'initial' | 'saved' | 'uploaded', silent = false) => {
     const canvas = canvasRef.current;
@@ -76,14 +89,23 @@ export const SignaturePad: React.FC<Props> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    if (!dataUrl || !dataUrl.trim()) {
+      clearCanvasWithWhite(canvas);
+      setHasSignature(false);
+      setSigSource(null);
+      return;
+    }
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // Clear previous canvas drawing
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Clear with pure white background (never leave transparent pixels)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
       const hRatio = canvas.width / img.width;
       const vRatio = canvas.height / img.height;
-      const ratio = Math.min(hRatio, vRatio) * 0.9;
+      const ratio = Math.min(hRatio, vRatio) * 0.88;
       const centerShift_x = (canvas.width - img.width * ratio) / 2;
       const centerShift_y = (canvas.height - img.height * ratio) / 2;
       
@@ -119,11 +141,21 @@ export const SignaturePad: React.FC<Props> = ({
     };
 
     img.onerror = () => {
-      showFeedback('Ralat membaca fail imej tandatangan. Sila cuba fail imej lain.', 'error');
+      if (!silent) {
+        showFeedback('Ralat membaca fail imej tandatangan. Sila cuba fail imej lain.', 'error');
+      }
     };
 
     img.src = dataUrl;
-  }, [onSave, onSaveToLibrary]);
+  }, [onSave, onSaveToLibrary, clearCanvasWithWhite]);
+
+  // Initialize canvas on mount
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      clearCanvasWithWhite(canvas);
+    }
+  }, [clearCanvasWithWhite]);
 
   // Reset cleared state when target person changes
   useEffect(() => {
@@ -224,8 +256,7 @@ export const SignaturePad: React.FC<Props> = ({
   const clearOldSignature = () => {
     const canvas = canvasRef.current;
     if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      clearCanvasWithWhite(canvas);
     }
     userClearedRef.current = true;
     setHasSignature(false);
@@ -233,7 +264,7 @@ export const SignaturePad: React.FC<Props> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
     onClear();
     onSave('');
-    showFeedback('Tandatangan telah dikosongkan. Sila guna pen atau muat naik fail imej baru.', 'info');
+    showFeedback('Ruang tandatangan telah dikosongkan.', 'info');
   };
 
   const handleFileProcess = (file: File) => {
@@ -287,24 +318,10 @@ export const SignaturePad: React.FC<Props> = ({
     }
   };
 
-  const handleUseSaved = () => {
-    if (savedSignature) {
-      userClearedRef.current = false;
-      drawImageToCanvas(savedSignature, 'saved');
-    }
-  };
-
-  const handleDeleteSavedClick = () => {
-    if (onDeleteFromLibrary) {
-      onDeleteFromLibrary();
-      showFeedback('Tandatangan profil telah dipadam.', 'info');
-    }
-  };
-
   return (
     <div className="space-y-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
       {/* Header Bar: Label, Recipient Name & Status Badge */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <label className="text-sm font-black text-slate-800 flex items-center gap-1.5">
@@ -312,67 +329,38 @@ export const SignaturePad: React.FC<Props> = ({
               {label}
             </label>
             {hasSignature ? (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
+              <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
                 sigSource === 'uploaded'
                   ? 'bg-blue-50 text-blue-700 border-blue-200'
                   : sigSource === 'drawn'
                     ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : sigSource === 'saved'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
               }`}>
-                <CheckCircleIcon className="h-3 w-3" />
-                {sigSource === 'uploaded' && 'Imej Dimuat Naik'}
-                {sigSource === 'drawn' && 'Tandatangan Guna Pen'}
-                {sigSource === 'saved' && 'Tersimpan (Profil)'}
-                {sigSource === 'initial' && 'Tandatangan Sedia Ada'}
-                {!sigSource && 'Tandatangan Sedia'}
+                <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" />
+                Telah Ditandatangani
               </span>
             ) : (
-              <span className="text-[10px] font-semibold text-rose-500 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 Belum Ditandatangani
               </span>
             )}
           </div>
           {personName && (
-            <p className="text-[11px] text-slate-500 font-medium mt-0.5 truncate max-w-xs">
-              Nama: <span className="font-semibold text-slate-700">{personName}</span>
+            <p className="text-xs text-slate-500 font-medium mt-1 truncate max-w-sm">
+              Pegawai: <span className="font-bold text-slate-700">{personName}</span>
             </p>
           )}
         </div>
 
-        {/* Global Signature Actions: Guna Profil, Padam */}
-        <div className="flex items-center flex-wrap gap-1.5">
-          {savedSignature && (
-            <button
-              type="button"
-              onClick={handleUseSaved}
-              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold rounded-lg border border-amber-300 transition-all flex items-center gap-1 shadow-sm active:scale-95"
-              title="Gunakan tandatangan yang telah tersimpan dalam profil sistem"
-            >
-              <SparklesIcon className="w-3.5 h-3.5 text-amber-600" />
-              Guna Profil
-            </button>
-          )}
-
-          {savedSignature && onDeleteFromLibrary && (
-            <button
-              type="button"
-              onClick={handleDeleteSavedClick}
-              className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-[10px] font-medium rounded-lg border border-slate-200 hover:border-rose-200 transition-all"
-              title="Padam tandatangan tersimpan dalam profil"
-            >
-              <TrashIcon className="w-3.5 h-3.5" />
-            </button>
-          )}
-
+        {/* Top Right Action: Padam / Reset */}
+        <div className="flex items-center gap-1.5">
           {hasSignature && (
             <button
               type="button"
               onClick={clearOldSignature}
-              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold rounded-lg border border-rose-300 transition-all flex items-center gap-1 shadow-sm active:scale-95"
-              title="Kosongkan tandatangan dan buat semula"
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-lg border border-rose-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Padam tandatangan ini dan buat semula"
             >
               <TrashIcon className="w-3.5 h-3.5 text-rose-600" />
               Padam / Reset
@@ -382,7 +370,7 @@ export const SignaturePad: React.FC<Props> = ({
       </div>
 
       {/* Main Mode Switcher: Kekalkan Muat Naik Tandatangan & Tandatangan Mengguna Pen */}
-      <div className="flex items-center gap-2 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
+      <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
         <button
           type="button"
           onClick={() => setActiveMode('pen')}
@@ -413,12 +401,21 @@ export const SignaturePad: React.FC<Props> = ({
       {/* Mode-Specific Controls */}
       {activeMode === 'pen' ? (
         /* --- PEN CONTROLS --- */
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 text-xs">
-          <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-xs">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-              🎨 Warna:
+              🎨 Warna Dakwat:
             </span>
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPenColor('#1e3a8a')}
+                className={`w-6 h-6 rounded-full border-2 transition-all ${
+                  penColor === '#1e3a8a' ? 'border-indigo-600 scale-110 shadow-sm ring-2 ring-indigo-200' : 'border-slate-300'
+                }`}
+                style={{ backgroundColor: '#1e3a8a' }}
+                title="Warna Biru Dokumen / Rasmi (Paling Disyorkan)"
+              />
               <button
                 type="button"
                 onClick={() => setPenColor('#0f172a')}
@@ -430,12 +427,12 @@ export const SignaturePad: React.FC<Props> = ({
               />
               <button
                 type="button"
-                onClick={() => setPenColor('#1e40af')}
+                onClick={() => setPenColor('#1d4ed8')}
                 className={`w-6 h-6 rounded-full border-2 transition-all ${
-                  penColor === '#1e40af' ? 'border-indigo-600 scale-110 shadow-sm ring-2 ring-indigo-200' : 'border-slate-300'
+                  penColor === '#1d4ed8' ? 'border-indigo-600 scale-110 shadow-sm ring-2 ring-indigo-200' : 'border-slate-300'
                 }`}
-                style={{ backgroundColor: '#1e40af' }}
-                title="Warna Biru Dokumen / Rasmi"
+                style={{ backgroundColor: '#1d4ed8' }}
+                title="Warna Biru Terang"
               />
             </div>
 
@@ -447,27 +444,27 @@ export const SignaturePad: React.FC<Props> = ({
             <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
               <button
                 type="button"
-                onClick={() => setPenWidth(1.8)}
-                className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                  penWidth === 1.8 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                onClick={() => setPenWidth(1.6)}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded ${
+                  penWidth === 1.6 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 Halus
               </button>
               <button
                 type="button"
-                onClick={() => setPenWidth(2.8)}
-                className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                  penWidth === 2.8 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                onClick={() => setPenWidth(2.5)}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded ${
+                  penWidth === 2.5 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 Biasa
               </button>
               <button
                 type="button"
-                onClick={() => setPenWidth(4.2)}
-                className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                  penWidth === 4.2 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                onClick={() => setPenWidth(3.8)}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded ${
+                  penWidth === 3.8 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 Tebal
@@ -483,9 +480,9 @@ export const SignaturePad: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={clearOldSignature}
-                className="px-2 py-1 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-all flex items-center gap-1"
+                className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-all flex items-center gap-1"
               >
-                <TrashIcon className="w-3 h-3" />
+                <TrashIcon className="w-3.5 h-3.5" />
                 Padam Tulisan
               </button>
             )}
@@ -503,7 +500,7 @@ export const SignaturePad: React.FC<Props> = ({
                 Muat Naik Fail Imej Tandatangan
               </p>
               <p className="text-[11px] text-blue-700/80">
-                Pilih fail dari komputer / telefon atau seret terus ke kotak di bawah (PNG, JPG, WEBP).
+                Pilih fail imej dari peranti anda atau seret terus ke dalam kotak di bawah (PNG, JPG, WEBP).
               </p>
             </div>
           </div>
@@ -512,7 +509,7 @@ export const SignaturePad: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full sm:w-auto px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
             >
               <ArrowUpTrayIcon className="w-3.5 h-3.5" />
               Pilih Fail Tandatangan
@@ -535,7 +532,7 @@ export const SignaturePad: React.FC<Props> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative bg-slate-50/50 border-2 rounded-xl overflow-hidden transition-all shadow-inner ${
+        className={`relative rounded-xl overflow-hidden transition-all shadow-inner border-2 ${
           isDraggingOver 
             ? 'border-indigo-500 bg-indigo-50/50 ring-4 ring-indigo-200' 
             : hasSignature 
@@ -547,10 +544,10 @@ export const SignaturePad: React.FC<Props> = ({
       >
         <canvas
           ref={canvasRef}
-          width={400}
-          height={140}
+          width={560}
+          height={180}
           style={{ touchAction: 'none' }}
-          className={`w-full h-36 bg-white block select-none ${
+          className={`w-full h-40 bg-white block select-none ${
             activeMode === 'pen' ? 'cursor-crosshair' : 'cursor-default'
           }`}
           onPointerDown={activeMode === 'pen' ? handlePointerDown : undefined}
@@ -558,6 +555,14 @@ export const SignaturePad: React.FC<Props> = ({
           onPointerUp={activeMode === 'pen' ? handlePointerUp : undefined}
           onPointerCancel={activeMode === 'pen' ? handlePointerUp : undefined}
         />
+
+        {/* Elegant Official Signature Baseline Guide (Physical form style) */}
+        {!hasSignature && activeMode === 'pen' && (
+          <div className="pointer-events-none absolute inset-x-8 bottom-7 border-b border-dashed border-slate-300 flex items-center justify-between text-[11px] text-slate-400 font-medium select-none pb-0.5">
+            <span className="font-bold text-slate-400">✕ Tandatangan di atas garisan</span>
+            <span className="text-[10px] text-slate-400 hidden sm:inline">LAM-PT-03-04</span>
+          </div>
+        )}
 
         {/* Empty State Overlay */}
         {!hasSignature && (
@@ -572,29 +577,29 @@ export const SignaturePad: React.FC<Props> = ({
             }`}
           >
             {activeMode === 'pen' ? (
-              <>
-                <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mb-1 border border-indigo-100">
+              <div className="space-y-1">
+                <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-1 border border-indigo-100 shadow-sm">
                   <PencilSquareIcon className="w-5 h-5" />
                 </div>
                 <p className="text-xs font-bold text-slate-700">
                   ✍️ Tandatangan di sini menggunakan pen / stylus / jari
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Lukis terus atas garisan atau klik tab "Muat Naik Tandatangan" untuk fail imej
+                <p className="text-[11px] text-slate-500">
+                  Lukis tandatangan anda atau klik tab "Muat Naik Tandatangan" untuk fail imej
                 </p>
-              </>
+              </div>
             ) : (
-              <>
-                <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-1 border border-blue-100">
+              <div className="space-y-1">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-1 border border-blue-100 shadow-sm">
                   <ArrowUpTrayIcon className="w-5 h-5" />
                 </div>
                 <p className="text-xs font-bold text-blue-900">
                   Klik di sini untuk memuat naik imej tandatangan
                 </p>
-                <p className="text-[11px] text-blue-600 mt-0.5">
+                <p className="text-[11px] text-blue-600">
                   atau seret dan lepas fail imej anda terus ke dalam kotak ini
                 </p>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -605,23 +610,26 @@ export const SignaturePad: React.FC<Props> = ({
             <button
               type="button"
               onClick={clearOldSignature}
-              className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold rounded-lg border border-rose-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-lg border border-rose-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
               title="Padam tandatangan ini"
             >
-              <TrashIcon className="h-3 w-3 text-rose-600" />
+              <TrashIcon className="h-3.5 w-3.5 text-rose-600" />
               Padam
             </button>
             <button
               type="button"
               onClick={() => {
-                setActiveMode('upload');
-                fileInputRef.current?.click();
+                if (activeMode === 'upload') {
+                  fileInputRef.current?.click();
+                } else {
+                  clearOldSignature();
+                }
               }}
-              className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg border border-blue-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
-              title="Muat naik imej baru untuk menggantikan"
+              className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+              title={activeMode === 'upload' ? 'Pilih fail imej lain' : 'Lukis semula tandatangan'}
             >
-              <ArrowUpTrayIcon className="h-3 w-3 text-blue-600" />
-              Tukar Fail
+              <ArrowPathIcon className="h-3.5 w-3.5 text-indigo-600" />
+              {activeMode === 'upload' ? 'Tukar Fail' : 'Lukis Semula'}
             </button>
           </div>
         )}
@@ -629,8 +637,8 @@ export const SignaturePad: React.FC<Props> = ({
         {/* Drag-over indicator */}
         {isDraggingOver && (
           <div className="pointer-events-none absolute inset-0 bg-blue-500/10 backdrop-blur-[1px] flex items-center justify-center border-2 border-dashed border-blue-600 rounded-xl">
-            <div className="bg-white px-4 py-2 rounded-xl shadow-lg border border-blue-200 flex items-center gap-2 text-xs font-bold text-blue-700 animate-bounce">
-              <PhotoIcon className="w-4 h-4 text-blue-600" />
+            <div className="bg-white px-4 py-2.5 rounded-xl shadow-lg border border-blue-200 flex items-center gap-2 text-xs font-bold text-blue-700 animate-bounce">
+              <PhotoIcon className="w-5 h-5 text-blue-600" />
               Lepaskan fail imej di sini untuk muat naik
             </div>
           </div>
@@ -640,7 +648,7 @@ export const SignaturePad: React.FC<Props> = ({
       {/* Guide Text & Toast Feedback */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 text-[11px] min-h-[20px]">
         <span className="text-slate-500 font-medium">
-          💡 Anda boleh bertukar antara <strong className="text-indigo-700">Tandatangan Guna Pen</strong> dan <strong className="text-blue-700">Muat Naik Tandatangan</strong> pada bila-bila masa.
+          💡 Anda boleh menandatangani menggunakan <strong className="text-indigo-700">Tandatangan Guna Pen</strong> atau <strong className="text-blue-700">Muat Naik Tandatangan</strong> pada bila-bila masa.
         </span>
         {feedback && (
           <span className={`font-bold animate-in fade-in duration-200 flex items-center gap-1 shrink-0 ${
