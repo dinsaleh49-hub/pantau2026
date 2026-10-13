@@ -731,6 +731,15 @@ export const Dashboard: React.FC<Props> = ({
               <ArrowPathIcon className="h-4 w-4 text-indigo-600 group-active:animate-spin" /> Kemaskini Data
             </button>
           )}
+          {onRestoreData && isAdminView && (
+            <button 
+              onClick={onRestoreData} 
+              className="flex items-center gap-2 px-4 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl text-sm font-bold text-amber-800 transition-all shadow-sm group"
+              title="Pulihkan Data Pemantauan (73 Pensyarah)"
+            >
+              <ArrowPathIcon className="h-4 w-4 text-amber-600" /> Pulihkan Data 73 Pensyarah
+            </button>
+          )}
           <button onClick={() => setShowGuideModal(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
             <InformationCircleIcon className="h-4 w-4 text-indigo-600" /> Panduan
           </button>
@@ -1111,10 +1120,10 @@ export const Dashboard: React.FC<Props> = ({
                           )}
                           <button 
                             onClick={() => onDeleteRecord(record.id)} 
-                            className="p-1.5 text-slate-400 hover:text-rose-600" 
-                            title="Padam Rekod Penilaian"
+                            className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-700 rounded text-xs font-bold transition-all shadow-sm active:scale-95" 
+                            title="Padam Rekod Penilaian Ini"
                           >
-                            <TrashIcon className="h-4 w-4" />
+                            <TrashIcon className="h-3.5 w-3.5" /> Padam
                           </button>
                           </td>
                         </tr>
@@ -1406,6 +1415,13 @@ export const Dashboard: React.FC<Props> = ({
                              {(isAdminView || canEdit) && (
                                <>
                                  <button onClick={() => onEditRecord(item.latestRecord!)} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-sm transition-all active:scale-95" title="Kemaskini Rekod Pemantauan Terkini"><PencilSquareIcon className="h-3 w-3" /> Kemaskini</button>
+                                <button 
+                                  onClick={() => onDeleteRecord(item.latestRecord!.id)} 
+                                  className="flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded text-[10px] font-bold shadow-sm transition-all active:scale-95" 
+                                  title="Padam Rekod Pemantauan Selesai Ini"
+                                >
+                                  <TrashIcon className="h-3 w-3" /> Padam Rekod
+                                </button>
                                  {isAdminView && (
                                    <button 
                                     onClick={() => handleSaveToDrive(item.latestRecord!)} 
@@ -1657,6 +1673,15 @@ export const Dashboard: React.FC<Props> = ({
                                 </button>
                               )}
                               <button onClick={() => onEditRecord(item.latestRecord!)} className="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-sm transition-all" title="Kemaskini Rekod Penilaian"><PencilSquareIcon className="h-3 w-3" /> Kemaskini</button>
+                              {(isAdminView || canEdit) && (
+                                <button 
+                                  onClick={() => onDeleteRecord(item.latestRecord!.id)} 
+                                  className="flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded text-[10px] font-bold shadow-sm transition-all active:scale-95" 
+                                  title="Padam Rekod Pemantauan Selesai Ini"
+                                >
+                                  <TrashIcon className="h-3 w-3" /> Padam Rekod
+                                </button>
+                              )}
                               <button 
                                 onClick={() => generatePDF(item.latestRecord!, 'save')} 
                                 className="flex items-center gap-1 px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-[10px] font-bold hover:bg-indigo-100 transition-colors"
@@ -1763,10 +1788,10 @@ export const Dashboard: React.FC<Props> = ({
                             )}
                             <button 
                               onClick={() => onDeleteRecord(record.id)} 
-                              className="p-1.5 text-slate-400 hover:text-rose-600" 
-                              title="Padam Rekod Penilaian"
+                              className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-700 rounded text-xs font-bold transition-all shadow-sm active:scale-95" 
+                              title="Padam Rekod Penilaian Ini"
                             >
-                              <TrashIcon className="h-4 w-4" />
+                              <TrashIcon className="h-3.5 w-3.5" /> Padam
                             </button>
                           </td>
                         </tr>
@@ -2318,6 +2343,15 @@ export const Dashboard: React.FC<Props> = ({
                         >
                           <ArrowDownTrayIcon className="h-4 w-4" />
                         </button>
+                        {(isAdminView || canEdit) && (
+                          <button 
+                            onClick={() => { setSelectedLecturerHistory(null); onDeleteRecord(record.id); }} 
+                            className="p-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl transition-all shadow-sm active:scale-95" 
+                            title="Padam Rekod Pemantauan Sesi Ini"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

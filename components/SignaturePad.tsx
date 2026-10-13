@@ -133,7 +133,7 @@ export const SignaturePad: React.FC<Props> = ({
         if (source === 'uploaded') {
           showFeedback('Tandatangan imej berjaya dimuat naik & disimpan!', 'success');
         } else if (source === 'saved') {
-          showFeedback('Tandatangan profil berjaya dimuatkan!', 'success');
+          showFeedback('Tandatangan berjaya dimuatkan!', 'success');
         } else {
           showFeedback('Tandatangan sedia ada dimuatkan!', 'info');
         }

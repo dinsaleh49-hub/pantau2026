@@ -803,15 +803,18 @@ const App: React.FC = () => {
       updatedRecords = records.filter((r: EvaluationRecord) => r.id !== confirmModal.targetId);
       setRecords(updatedRecords);
       setIsLocalUpdate(prev => ({ ...prev, records: true }));
+      showNotification('Rekod pemantauan berjaya dipadam.', 'success');
     } else if (confirmModal.type === 'lecturer' && confirmModal.targetId) {
       const [name, dept] = confirmModal.targetId.split('|');
       updatedLecturers = lecturersList.filter((l: Lecturer) => !(l.name === name && l.department === dept));
       setLecturersList(updatedLecturers);
       setIsLocalUpdate(prev => ({ ...prev, lecturers: true }));
+      showNotification('Maklumat pensyarah berjaya dipadam.', 'success');
     } else if (confirmModal.type === 'schedule' && confirmModal.targetId) {
       updatedSchedules = schedules.filter((s: MonitoringSchedule) => s.id !== confirmModal.targetId);
       setSchedules(updatedSchedules);
       setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
+      showNotification('Jadual pemantauan berjaya dipadam.', 'success');
     }
 
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
