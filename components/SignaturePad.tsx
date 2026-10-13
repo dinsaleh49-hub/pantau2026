@@ -55,9 +55,10 @@ export const SignaturePad: React.FC<Props> = ({
   // Mode selection: 'pen' (Tandatangan Guna Pen) or 'upload' (Muat Naik Tandatangan)
   const [activeMode, setActiveMode] = useState<'pen' | 'upload'>('pen');
   
-  // Pen configuration: Default royal blue ink (standard official academic signature)
-  const [penColor, setPenColor] = useState<string>('#1e3a8a'); 
-  const penWidth = 2.5; // Fixed optimal thickness
+  // Pen configuration: Official deep black ink with bold, crisp stroke for maximum readability
+  const penColor = '#0f172a'; 
+  const penWidth = 3.6; // Bold, crisp, highly legible line stroke
+  const lastCoordRef = useRef<{ x: number; y: number } | null>(null);
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -208,8 +209,16 @@ export const SignaturePad: React.FC<Props> = ({
     ctx.lineWidth = penWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+
+    // Draw initial dot for immediate responsiveness on tap
+    ctx.fillStyle = penColor;
+    ctx.beginPath();
+    ctx.arc(x, y, penWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.beginPath();
     ctx.moveTo(x, y);
+    lastCoordRef.current = { x, y };
     setIsDrawing(true);
     setSigSource('drawn');
     userClearedRef.current = false;
@@ -222,15 +231,25 @@ export const SignaturePad: React.FC<Props> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { x, y } = getCoordinates(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    const current = getCoordinates(e);
+    if (lastCoordRef.current) {
+      const midX = (lastCoordRef.current.x + current.x) / 2;
+      const midY = (lastCoordRef.current.y + current.y) / 2;
+      ctx.quadraticCurveTo(lastCoordRef.current.x, lastCoordRef.current.y, midX, midY);
+      ctx.stroke();
+      lastCoordRef.current = current;
+    } else {
+      ctx.lineTo(current.x, current.y);
+      ctx.stroke();
+      lastCoordRef.current = current;
+    }
     setHasSignature(true);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     setIsDrawing(false);
+    lastCoordRef.current = null;
     
     try {
       if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -402,46 +421,18 @@ export const SignaturePad: React.FC<Props> = ({
       {activeMode === 'pen' ? (
         /* --- PEN CONTROLS --- */
         <div className="flex items-center justify-between gap-2.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-xs">
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-              🎨 Warna Dakwat:
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-slate-900 ring-2 ring-slate-300" />
+            <span className="text-xs font-bold text-slate-800">
+              Dakwat Hitam Rasmi (Jelas & Boleh Dibaca)
             </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setPenColor('#1e3a8a')}
-                className={`w-6 h-6 rounded-full border-2 transition-all ${
-                  penColor === '#1e3a8a' ? 'border-indigo-600 scale-110 shadow-sm ring-2 ring-indigo-200' : 'border-slate-300'
-                }`}
-                style={{ backgroundColor: '#1e3a8a' }}
-                title="Warna Biru Dokumen / Rasmi (Paling Disyorkan)"
-              />
-              <button
-                type="button"
-                onClick={() => setPenColor('#0f172a')}
-                className={`w-6 h-6 rounded-full border-2 transition-all ${
-                  penColor === '#0f172a' ? 'border-indigo-600 scale-110 shadow-sm ring-2 ring-indigo-200' : 'border-slate-300'
-                }`}
-                style={{ backgroundColor: '#0f172a' }}
-                title="Warna Hitam Pekat"
-              />
-              <button
-                type="button"
-                onClick={() => setPenColor('#1d4ed8')}
-                className={`w-6 h-6 rounded-full border-2 transition-all ${
-                  penColor === '#1d4ed8' ? 'border-indigo-600 scale-110 shadow-sm ring-2 ring-indigo-200' : 'border-slate-300'
-                }`}
-                style={{ backgroundColor: '#1d4ed8' }}
-                title="Warna Biru Terang"
-              />
-            </div>
           </div>
 
           {hasSignature && (
             <button
               type="button"
               onClick={clearOldSignature}
-              className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-all flex items-center gap-1"
+              className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
             >
               <TrashIcon className="w-3.5 h-3.5" />
               Padam Tulisan
