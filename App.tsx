@@ -117,16 +117,14 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('ipgkpt_lecturers');
     return saved ? JSON.parse(saved) : LECTURERS;
   });
-  const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>(() => {
+  // Ruangan tandatangan dikosongkan dan tandatangan terdahulu dipadamkan
+  const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>({});
+
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('ipgkpt_signatures');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && Object.keys(parsed).length > 0) return parsed;
-      }
+      localStorage.removeItem('ipgkpt_signatures');
     } catch {}
-    return INITIAL_SIGNATURES;
-  });
+  }, []);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
@@ -653,8 +651,8 @@ const App: React.FC = () => {
       remarks: '',
       scores: {},
       itemRemarks: {},
-      lecturerSignature: targetLecturer ? (savedSignatures[targetLecturer.trim()] || '') : '',
-      evaluatorSignature: user?.username ? (savedSignatures[user.username.trim()] || '') : ''
+      lecturerSignature: '',
+      evaluatorSignature: ''
     };
     setEditingRecord(template);
     setView('form');
@@ -988,7 +986,6 @@ const App: React.FC = () => {
             onAddLecturer={handleAddLecturer}
             onUpdateLecturer={handleUpdateLecturer}
             onRefresh={() => fetchData()}
-            onRestoreData={handleOpenRestoreConfirm}
             lastSync={lastSync}
           />
         ) : (

@@ -13,18 +13,15 @@ interface Props {
   label: string;
   personName?: string;
   initialSignature?: string;
-  savedSignature?: string;
   onSave: (dataUrl: string) => void;
   onClear: () => void;
-  onSaveToLibrary?: (signatureDataUrl: string) => void;
-  onDeleteFromLibrary?: () => void;
 }
 
-type SignatureSource = 'initial' | 'saved' | 'uploaded' | 'drawn' | null;
+type SignatureSource = 'initial' | 'uploaded' | 'drawn' | null;
 
 /**
  * Exports canvas content as a crisp PNG with a guaranteed pure white background.
- * This completely prevents transparent alpha channels from turning into black boxes in jsPDF or previews.
+ * Prevents transparent alpha channels from turning into black boxes in jsPDF or previews.
  */
 const getOptimizedCanvasDataUrl = (canvas: HTMLCanvasElement): string => {
   const offCanvas = document.createElement('canvas');
@@ -44,10 +41,8 @@ export const SignaturePad: React.FC<Props> = ({
   label, 
   personName,
   initialSignature, 
-  savedSignature,
   onSave, 
-  onClear,
-  onSaveToLibrary
+  onClear
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,9 +50,9 @@ export const SignaturePad: React.FC<Props> = ({
   // Mode selection: 'pen' (Tandatangan Guna Pen) or 'upload' (Muat Naik Tandatangan)
   const [activeMode, setActiveMode] = useState<'pen' | 'upload'>('pen');
   
-  // Pen configuration: Official deep black ink with bold, crisp stroke for maximum readability
-  const penColor = '#0f172a'; 
-  const penWidth = 3.6; // Bold, crisp, highly legible line stroke
+  // Official ink choices: Pekat, kontras tinggi & boleh dibaca dengan jelas dalam dokumen rasmi
+  const [penColor, setPenColor] = useState<'#0f172a' | '#1e3a8a'>('#0f172a');
+  const penWidth = 3.5; // Bold, crisp stroke for maximum legibility
   const lastCoordRef = useRef<{ x: number; y: number } | null>(null);
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -66,9 +61,8 @@ export const SignaturePad: React.FC<Props> = ({
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // Track if user explicitly cleared to prevent useEffect auto-reloading
+  // Track if user explicitly cleared to prevent auto-reloading
   const userClearedRef = useRef(false);
-  // Track previous personName to reset userClearedRef when person changes
   const prevPersonRef = useRef<string | undefined>(personName);
 
   const showFeedback = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -76,7 +70,7 @@ export const SignaturePad: React.FC<Props> = ({
     setTimeout(() => setFeedback(null), 3000);
   };
 
-  // Helper to fill canvas with white background
+  // Helper to fill canvas with pure white background
   const clearCanvasWithWhite = useCallback((canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -84,7 +78,7 @@ export const SignaturePad: React.FC<Props> = ({
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }, []);
 
-  const drawImageToCanvas = useCallback((dataUrl: string, source: 'initial' | 'saved' | 'uploaded', silent = false) => {
+  const drawImageToCanvas = useCallback((dataUrl: string, source: 'initial' | 'uploaded', silent = false) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -100,7 +94,6 @@ export const SignaturePad: React.FC<Props> = ({
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // Clear with pure white background (never leave transparent pixels)
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -126,31 +119,26 @@ export const SignaturePad: React.FC<Props> = ({
       userClearedRef.current = false;
       const finalDataUrl = getOptimizedCanvasDataUrl(canvas);
       onSave(finalDataUrl);
-      if (onSaveToLibrary) {
-        onSaveToLibrary(finalDataUrl);
-      }
 
       if (!silent) {
         if (source === 'uploaded') {
-          showFeedback('Tandatangan imej berjaya dimuat naik & disimpan!', 'success');
-        } else if (source === 'saved') {
-          showFeedback('Tandatangan berjaya dimuatkan!', 'success');
+          showFeedback('Tandatangan imej baharu berjaya dimuat naik!', 'success');
         } else {
-          showFeedback('Tandatangan sedia ada dimuatkan!', 'info');
+          showFeedback('Tandatangan rekod sedia ada dimuatkan.', 'info');
         }
       }
     };
 
     img.onerror = () => {
       if (!silent) {
-        showFeedback('Ralat membaca fail imej tandatangan. Sila cuba fail imej lain.', 'error');
+        showFeedback('Ralat membaca fail imej tandatangan. Sila cuba fail lain.', 'error');
       }
     };
 
     img.src = dataUrl;
-  }, [onSave, onSaveToLibrary, clearCanvasWithWhite]);
+  }, [onSave, clearCanvasWithWhite]);
 
-  // Initialize canvas on mount
+  // Initialize canvas with clean white on mount
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -158,7 +146,7 @@ export const SignaturePad: React.FC<Props> = ({
     }
   }, [clearCanvasWithWhite]);
 
-  // Reset cleared state when target person changes
+  // When person changes, reset to empty
   useEffect(() => {
     if (personName !== prevPersonRef.current) {
       prevPersonRef.current = personName;
@@ -166,16 +154,14 @@ export const SignaturePad: React.FC<Props> = ({
     }
   }, [personName]);
 
-  // Load initial or saved signature when available, UNLESS explicitly cleared by user
+  // Load initialSignature ONLY if editing an existing record and user hasn't cleared
   useEffect(() => {
     if (userClearedRef.current) return;
 
     if (initialSignature && !hasSignature) {
       drawImageToCanvas(initialSignature, 'initial', true);
-    } else if (savedSignature && !hasSignature) {
-      drawImageToCanvas(savedSignature, 'saved', true);
     }
-  }, [initialSignature, savedSignature, hasSignature, drawImageToCanvas]);
+  }, [initialSignature, hasSignature, drawImageToCanvas]);
 
   const getCoordinates = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -210,7 +196,7 @@ export const SignaturePad: React.FC<Props> = ({
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Draw initial dot for immediate responsiveness on tap
+    // Draw initial dot for instant responsiveness
     ctx.fillStyle = penColor;
     ctx.beginPath();
     ctx.arc(x, y, penWidth / 2, 0, Math.PI * 2);
@@ -235,6 +221,10 @@ export const SignaturePad: React.FC<Props> = ({
     if (lastCoordRef.current) {
       const midX = (lastCoordRef.current.x + current.x) / 2;
       const midY = (lastCoordRef.current.y + current.y) / 2;
+      ctx.strokeStyle = penColor;
+      ctx.lineWidth = penWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.quadraticCurveTo(lastCoordRef.current.x, lastCoordRef.current.y, midX, midY);
       ctx.stroke();
       lastCoordRef.current = current;
@@ -263,15 +253,12 @@ export const SignaturePad: React.FC<Props> = ({
     if (canvas) {
       const dataUrl = getOptimizedCanvasDataUrl(canvas);
       onSave(dataUrl);
-      if (onSaveToLibrary) {
-        onSaveToLibrary(dataUrl);
-      }
       setHasSignature(true);
       setSigSource('drawn');
     }
   };
 
-  // Explicitly clear signature
+  // Explicitly clear signature to blank
   const clearOldSignature = () => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -283,7 +270,7 @@ export const SignaturePad: React.FC<Props> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
     onClear();
     onSave('');
-    showFeedback('Ruang tandatangan telah dikosongkan.', 'info');
+    showFeedback('Ruangan tandatangan dikosongkan. Sila turunkan tandatangan baharu.', 'info');
   };
 
   const handleFileProcess = (file: File) => {
@@ -356,39 +343,43 @@ export const SignaturePad: React.FC<Props> = ({
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200'
               }`}>
                 <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" />
-                Telah Ditandatangani
+                {sigSource === 'initial' ? 'Tandatangan Sedia Ada' : 'Tandatangan Baharu Disimpan'}
               </span>
             ) : (
               <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                Belum Ditandatangani
+                Ruangan Kosong (Belum Ditandatangani)
               </span>
             )}
           </div>
           {personName && (
             <p className="text-xs text-slate-500 font-medium mt-1 truncate max-w-sm">
-              Pegawai: <span className="font-bold text-slate-700">{personName}</span>
+              Nama: <span className="font-bold text-slate-700">{personName}</span>
             </p>
           )}
         </div>
 
-        {/* Top Right Action: Padam / Reset */}
+        {/* Top Right Action: Padam Tandatangan / Kosongkan Ruangan */}
         <div className="flex items-center gap-1.5">
-          {hasSignature && (
+          {hasSignature ? (
             <button
               type="button"
               onClick={clearOldSignature}
               className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-lg border border-rose-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
-              title="Padam tandatangan ini dan buat semula"
+              title="Padam tandatangan ini dan kosongkan ruangan untuk tandatangan baharu"
             >
               <TrashIcon className="w-3.5 h-3.5 text-rose-600" />
-              Padam / Reset
+              {sigSource === 'initial' ? 'Padam Tandatangan Terdahulu' : 'Kosongkan Ruangan'}
             </button>
+          ) : (
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
+              Sedia untuk tandatangan baharu
+            </span>
           )}
         </div>
       </div>
 
-      {/* Main Mode Switcher: Kekalkan Muat Naik Tandatangan & Tandatangan Mengguna Pen */}
+      {/* Main Mode Switcher: Tandatangan Guna Pen vs Muat Naik Tandatangan */}
       <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
         <button
           type="button"
@@ -419,20 +410,45 @@ export const SignaturePad: React.FC<Props> = ({
 
       {/* Mode-Specific Controls */}
       {activeMode === 'pen' ? (
-        /* --- PEN CONTROLS --- */
-        <div className="flex items-center justify-between gap-2.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-slate-900 ring-2 ring-slate-300" />
-            <span className="text-xs font-bold text-slate-800">
-              Dakwat Hitam Rasmi (Jelas & Boleh Dibaca)
-            </span>
+        /* --- PEN CONTROLS: Pilihan Warna Dakwat Rasmi Yang Boleh Dibaca --- */
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-600">Warna Dakwat (Boleh Dibaca):</span>
+            <div className="inline-flex rounded-lg p-0.5 bg-white border border-slate-200 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setPenColor('#0f172a')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                  penColor === '#0f172a'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Dakwat Hitam Rasmi (Jelas & Boleh Dibaca)"
+              >
+                <span className="w-2 h-2 rounded-full bg-slate-900 border border-white" />
+                Hitam Rasmi
+              </button>
+              <button
+                type="button"
+                onClick={() => setPenColor('#1e3a8a')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                  penColor === '#1e3a8a'
+                    ? 'bg-blue-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-blue-900'
+                }`}
+                title="Dakwat Biru Gelap Rasmi (Jelas & Boleh Dibaca)"
+              >
+                <span className="w-2 h-2 rounded-full bg-blue-900 border border-white" />
+                Biru Gelap Rasmi
+              </button>
+            </div>
           </div>
 
           {hasSignature && (
             <button
               type="button"
               onClick={clearOldSignature}
-              className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+              className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-all flex items-center gap-1 shadow-sm active:scale-95 self-end sm:self-auto"
             >
               <TrashIcon className="w-3.5 h-3.5" />
               Padam Tulisan
@@ -447,7 +463,7 @@ export const SignaturePad: React.FC<Props> = ({
               <DocumentArrowUpIcon className="w-4 h-4" />
             </div>
             <p className="font-bold text-blue-950 text-xs">
-              Muat Naik Fail Imej Tandatangan
+              Muat Naik Fail Imej Tandatangan Baharu
             </p>
           </div>
 
@@ -457,7 +473,7 @@ export const SignaturePad: React.FC<Props> = ({
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
           >
             <ArrowUpTrayIcon className="w-3.5 h-3.5" />
-            Pilih Fail
+            Pilih Fail Imej
           </button>
         </div>
       )}

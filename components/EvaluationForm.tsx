@@ -94,24 +94,11 @@ export const EvaluationForm: React.FC<Props> = ({
 
       setScores(initialData.scores || {});
       setItemRemarks(initialData.itemRemarks || {});
-      if (initialData.lecturerSignature) setLecturerSig(initialData.lecturerSignature);
-      if (initialData.evaluatorSignature) setEvaluatorSig(initialData.evaluatorSignature);
+      // Only keep signatures if editing an existing saved record with an id
+      if (initialData.id && initialData.lecturerSignature) setLecturerSig(initialData.lecturerSignature);
+      if (initialData.id && initialData.evaluatorSignature) setEvaluatorSig(initialData.evaluatorSignature);
     }
   }, [initialData]);
-
-  // Auto-populate saved signature for evaluator if available
-  useEffect(() => {
-    if (!evaluatorSig && formData.evaluatorName?.trim() && savedSignatures[formData.evaluatorName.trim()]) {
-      setEvaluatorSig(savedSignatures[formData.evaluatorName.trim()]);
-    }
-  }, [formData.evaluatorName, savedSignatures, evaluatorSig]);
-
-  // Auto-populate saved signature for lecturer if available
-  useEffect(() => {
-    if (!lecturerSig && formData.lecturerName?.trim() && savedSignatures[formData.lecturerName.trim()]) {
-      setLecturerSig(savedSignatures[formData.lecturerName.trim()]);
-    }
-  }, [formData.lecturerName, savedSignatures, lecturerSig]);
 
   const handleLecturerChange = (name: string) => {
     // Try to find a lecturer that matches both name and CURRENT department first
@@ -639,37 +626,47 @@ export const EvaluationForm: React.FC<Props> = ({
           />
         </div>
 
-        <div className="space-y-4 pt-2 border-t border-slate-100">
+        <div className="space-y-4 pt-4 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div>
+              <h4 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <span>✍️</span> Pengesahan Tandatangan Digital Rasmi
+              </h4>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Ruangan tandatangan dikosongkan. Hanya tandatangan baharu (guna pen atau muat naik fail) dibenarkan bagi setiap sesi pemantauan.
+              </p>
+            </div>
+            {(lecturerSig || evaluatorSig) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLecturerSig('');
+                  setEvaluatorSig('');
+                  if (onNotification) onNotification('Kedua-dua ruangan tandatangan telah dikosongkan.', 'success');
+                }}
+                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95 self-start sm:self-auto shrink-0"
+                title="Kosongkan kedua-dua ruangan tandatangan sekarang"
+              >
+                <TrashIcon className="w-3.5 h-3.5 text-rose-600" />
+                Kosongkan Semua Tandatangan
+              </button>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <SignaturePad 
               label="Tandatangan Pensyarah" 
               personName={formData.lecturerName}
-              onSave={(data) => {
-                setLecturerSig(data);
-                if (data && formData.lecturerName.trim() && onSaveSignature) {
-                  onSaveSignature(formData.lecturerName.trim(), data);
-                }
-              }}
+              onSave={(data) => setLecturerSig(data)}
               onClear={() => setLecturerSig('')}
-              initialSignature={initialData?.lecturerSignature}
-              savedSignature={savedSignatures[formData.lecturerName.trim()]}
-              onSaveToLibrary={(data) => onSaveSignature && onSaveSignature(formData.lecturerName.trim(), data)}
-              onDeleteFromLibrary={() => onDeleteSavedSignature && onDeleteSavedSignature(formData.lecturerName.trim())}
+              initialSignature={initialData?.id ? initialData.lecturerSignature : undefined}
             />
             <SignaturePad 
               label="Tandatangan Pemantau" 
               personName={formData.evaluatorName}
-              onSave={(data) => {
-                setEvaluatorSig(data);
-                if (data && formData.evaluatorName.trim() && onSaveSignature) {
-                  onSaveSignature(formData.evaluatorName.trim(), data);
-                }
-              }}
+              onSave={(data) => setEvaluatorSig(data)}
               onClear={() => setEvaluatorSig('')}
-              initialSignature={initialData?.evaluatorSignature}
-              savedSignature={savedSignatures[formData.evaluatorName.trim()]}
-              onSaveToLibrary={(data) => onSaveSignature && onSaveSignature(formData.evaluatorName.trim(), data)}
-              onDeleteFromLibrary={() => onDeleteSavedSignature && onDeleteSavedSignature(formData.evaluatorName.trim())}
+              initialSignature={initialData?.id ? initialData.evaluatorSignature : undefined}
             />
           </div>
         </div>

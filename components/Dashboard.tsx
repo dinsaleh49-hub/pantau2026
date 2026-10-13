@@ -74,7 +74,6 @@ interface Props {
   onAddLecturer: (lecturer: { name: string; department: string }) => void;
   onUpdateLecturer: (oldName: string, oldDept: string, updatedLecturer: { name: string; department: string }) => void;
   onRefresh?: () => void;
-  onRestoreData?: () => void;
   lastSync?: Date | null;
   userDept?: string;
   isRestrictedUser?: boolean;
@@ -108,7 +107,6 @@ export const Dashboard: React.FC<Props> = ({
   onAddLecturer,
   onUpdateLecturer,
   onRefresh,
-  onRestoreData,
   lastSync,
   isRestrictedUser,
   onStartEvaluation
