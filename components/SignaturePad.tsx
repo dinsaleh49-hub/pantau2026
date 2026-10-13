@@ -57,7 +57,7 @@ export const SignaturePad: React.FC<Props> = ({
   
   // Pen configuration: Default royal blue ink (standard official academic signature)
   const [penColor, setPenColor] = useState<string>('#1e3a8a'); 
-  const [penWidth, setPenWidth] = useState<number>(2.5); // default medium
+  const penWidth = 2.5; // Fixed optimal thickness
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -269,7 +269,7 @@ export const SignaturePad: React.FC<Props> = ({
 
   const handleFileProcess = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      showFeedback('Sila pilih fail berformat imej (PNG, JPG, JPEG, WEBP).', 'error');
+      showFeedback('Sila pilih fail berformat imej.', 'error');
       return;
     }
 
@@ -401,8 +401,8 @@ export const SignaturePad: React.FC<Props> = ({
       {/* Mode-Specific Controls */}
       {activeMode === 'pen' ? (
         /* --- PEN CONTROLS --- */
-        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-xs">
-          <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center justify-between gap-2.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-xs">
+          <div className="flex items-center gap-3">
             <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
               🎨 Warna Dakwat:
             </span>
@@ -435,86 +435,39 @@ export const SignaturePad: React.FC<Props> = ({
                 title="Warna Biru Terang"
               />
             </div>
-
-            <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block" />
-
-            <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-              ✏️ Saiz Pen:
-            </span>
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setPenWidth(1.6)}
-                className={`px-2.5 py-1 text-[11px] font-bold rounded ${
-                  penWidth === 1.6 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Halus
-              </button>
-              <button
-                type="button"
-                onClick={() => setPenWidth(2.5)}
-                className={`px-2.5 py-1 text-[11px] font-bold rounded ${
-                  penWidth === 2.5 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Biasa
-              </button>
-              <button
-                type="button"
-                onClick={() => setPenWidth(3.8)}
-                className={`px-2.5 py-1 text-[11px] font-bold rounded ${
-                  penWidth === 3.8 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Tebal
-              </button>
-            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
-              Stylus / Skrin Sentuh / Tetikus
-            </span>
-            {hasSignature && (
-              <button
-                type="button"
-                onClick={clearOldSignature}
-                className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-all flex items-center gap-1"
-              >
-                <TrashIcon className="w-3.5 h-3.5" />
-                Padam Tulisan
-              </button>
-            )}
-          </div>
+          {hasSignature && (
+            <button
+              type="button"
+              onClick={clearOldSignature}
+              className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-all flex items-center gap-1"
+            >
+              <TrashIcon className="w-3.5 h-3.5" />
+              Padam Tulisan
+            </button>
+          )}
         </div>
       ) : (
         /* --- UPLOAD CONTROLS --- */
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-blue-50/70 p-3 rounded-xl border border-blue-200 text-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-              <DocumentArrowUpIcon className="w-5 h-5" />
+        <div className="flex items-center justify-between gap-3 bg-blue-50/70 p-2.5 rounded-xl border border-blue-200 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+              <DocumentArrowUpIcon className="w-4 h-4" />
             </div>
-            <div>
-              <p className="font-bold text-blue-950 text-xs">
-                Muat Naik Fail Imej Tandatangan
-              </p>
-              <p className="text-[11px] text-blue-700/80">
-                Pilih fail imej dari peranti anda atau seret terus ke dalam kotak di bawah (PNG, JPG, WEBP).
-              </p>
-            </div>
+            <p className="font-bold text-blue-950 text-xs">
+              Muat Naik Fail Imej Tandatangan
+            </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-            >
-              <ArrowUpTrayIcon className="w-3.5 h-3.5" />
-              Pilih Fail Tandatangan
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+          >
+            <ArrowUpTrayIcon className="w-3.5 h-3.5" />
+            Pilih Fail
+          </button>
         </div>
       )}
 
@@ -578,26 +531,20 @@ export const SignaturePad: React.FC<Props> = ({
           >
             {activeMode === 'pen' ? (
               <div className="space-y-1">
-                <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-1 border border-indigo-100 shadow-sm">
-                  <PencilSquareIcon className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-1 border border-indigo-100 shadow-sm">
+                  <PencilSquareIcon className="w-4 h-4" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">
-                  ✍️ Tandatangan di sini menggunakan pen / stylus / jari
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  Lukis tandatangan anda atau klik tab "Muat Naik Tandatangan" untuk fail imej
+                <p className="text-xs font-bold text-slate-600">
+                  ✍️ Sila tandatangan di sini
                 </p>
               </div>
             ) : (
               <div className="space-y-1">
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-1 border border-blue-100 shadow-sm">
-                  <ArrowUpTrayIcon className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-1 border border-blue-100 shadow-sm">
+                  <ArrowUpTrayIcon className="w-4 h-4" />
                 </div>
-                <p className="text-xs font-bold text-blue-900">
-                  Klik di sini untuk memuat naik imej tandatangan
-                </p>
-                <p className="text-[11px] text-blue-600">
-                  atau seret dan lepas fail imej anda terus ke dalam kotak ini
+                <p className="text-xs font-bold text-blue-800">
+                  Klik untuk pilih fail imej tandatangan
                 </p>
               </div>
             )}
@@ -645,13 +592,10 @@ export const SignaturePad: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Guide Text & Toast Feedback */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 text-[11px] min-h-[20px]">
-        <span className="text-slate-500 font-medium">
-          💡 Anda boleh menandatangani menggunakan <strong className="text-indigo-700">Tandatangan Guna Pen</strong> atau <strong className="text-blue-700">Muat Naik Tandatangan</strong> pada bila-bila masa.
-        </span>
-        {feedback && (
-          <span className={`font-bold animate-in fade-in duration-200 flex items-center gap-1 shrink-0 ${
+      {/* Toast Feedback */}
+      {feedback && (
+        <div className="flex justify-end text-[11px] min-h-[18px]">
+          <span className={`font-bold animate-in fade-in duration-200 flex items-center gap-1 ${
             feedback.type === 'error' 
               ? 'text-rose-600' 
               : feedback.type === 'info' 
@@ -660,8 +604,8 @@ export const SignaturePad: React.FC<Props> = ({
           }`}>
             <CheckCircleIcon className="h-3.5 w-3.5" /> {feedback.message}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
