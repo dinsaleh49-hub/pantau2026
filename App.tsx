@@ -731,8 +731,9 @@ const App: React.FC = () => {
       isOpen: true,
       type: 'record',
       targetId: id,
-      title: 'Padam Rekod Penilaian?',
-      message: `Tindakan ini akan memadam rekod penilaian bagi ${record?.lecturerName} secara kekal.`
+      title: 'Padam Rekod Penilaian Pensyarah?',
+      message: `Adakah anda pasti mahu memadam rekod penilaian bagi ${record?.lecturerName || 'pensyarah ini'} secara kekal? Tindakan ini boleh dilakukan jika berlaku sebarang kesilapan pengisian.`,
+      confirmText: 'Ya, Padam Rekod'
     });
   };
 
@@ -741,8 +742,9 @@ const App: React.FC = () => {
       isOpen: true,
       type: 'lecturer',
       targetId: `${name}|${department}`,
-      title: 'Padam Pensyarah?',
-      message: `Adakah anda pasti mahu memadam "${name}" dari jabatan "${department}"? Rekod sedia ada akan KEKAL dalam arkib.`
+      title: 'Padam Maklumat Pensyarah?',
+      message: `Adakah anda pasti mahu memadam pensyarah "${name}" (${department}) dari senarai induk jika berlaku sebarang kesilapan pendaftaran?`,
+      confirmText: 'Ya, Padam Pensyarah'
     });
   };
 
@@ -1001,6 +1003,7 @@ const App: React.FC = () => {
             <EvaluationForm 
               onSubmit={handleAddRecord} 
               onCancel={() => { setEditingRecord(null); setView('dashboard'); }}
+              onDeleteRecord={(id) => { openDeleteRecordConfirm(id); setView('dashboard'); setEditingRecord(null); }}
               lecturers={accessibleLecturers} 
               userDept={user.department}
               isAdmin={user.role === 'admin' || user.department === 'SEMUA'}

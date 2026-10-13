@@ -116,7 +116,7 @@ export const Dashboard: React.FC<Props> = ({
   const isRestricted = !!isRestrictedUser || (username?.toLowerCase() === 'pensyarah' && userRole === 'user');
   const isAdminView = userRole === 'admin';
   const canEdit = true; // Diubah supaya pensyarah boleh mengemaskini (update) rekod/jadual jika perlu
-  const canDelete = isAdminView; // Hanya admin boleh memadam
+  const canDelete = !isRestricted; // Admin dan Pemantau boleh memadam jika berlaku kesilapan
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusSearchTerm, setStatusSearchTerm] = useState('');
@@ -1442,15 +1442,15 @@ export const Dashboard: React.FC<Props> = ({
                              <ClipboardDocumentCheckIcon className="h-3 w-3" /> Nilai
                            </button>
                          )}
-                         {(isAdminView || canEdit) && (
-                           <button 
-                             onClick={() => onDeleteLecturer(item.name, item.department)} 
-                             className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors" 
-                             title="Padam Pensyarah"
-                           >
-                             <TrashIcon className="h-4 w-4" />
-                           </button>
-                         )}
+                          {(isAdminView || canEdit) && (
+                            <button 
+                              onClick={() => onDeleteLecturer(item.name, item.department)} 
+                              className="flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-600 rounded text-[10px] font-bold transition-all shadow-sm active:scale-95" 
+                              title="Padam Maklumat Pensyarah (Jika Berlaku Kesilapan)"
+                            >
+                              <TrashIcon className="h-3 w-3" /> Padam Pensyarah
+                            </button>
+                          )}
                       </td>
                     </tr>
                   ))}
@@ -1696,10 +1696,10 @@ export const Dashboard: React.FC<Props> = ({
                           {(isAdminView || canEdit) && (
                             <button 
                               onClick={() => onDeleteLecturer(item.name, item.department)} 
-                              className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors" 
-                              title="Padam Pensyarah"
+                              className="flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-600 rounded text-[10px] font-bold transition-all shadow-sm active:scale-95" 
+                              title="Padam Maklumat Pensyarah (Jika Berlaku Kesilapan)"
                             >
-                              <TrashIcon className="h-3.5 w-3.5" />
+                              <TrashIcon className="h-3 w-3" /> Padam Pensyarah
                             </button>
                           )}
                         </div>
