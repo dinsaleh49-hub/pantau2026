@@ -205,7 +205,7 @@ export const EvaluationForm: React.FC<Props> = ({
     if (!isDraft && missingCriteria.length > 0) {
       const firstMissing = missingCriteria[0];
       if (onNotification) {
-        onNotification(`Sila lengkapkan semua kriteria penilaian (${missingCriteria.length} belum dinilai, cth: ${firstMissing.id}), atau klik "Simpan Draf".`, 'error');
+        onNotification(`Sila lengkapkan semua kriteria penilaian (${missingCriteria.length} belum dinilai, cth: ${firstMissing.id}).`, 'error');
       }
       // Scroll to the first missing criterion
       const element = document.getElementById(`criterion-${firstMissing.id}`);
@@ -547,15 +547,6 @@ export const EvaluationForm: React.FC<Props> = ({
                 Kosongkan
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => executeSave(true)}
-              disabled={isSubmitting}
-              className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-black transition-all shadow-sm active:scale-95 flex items-center gap-1"
-              title="Simpan draf penilaian ini pada bila-bila masa agar tidak hilang"
-            >
-              💾 Simpan Draf
-            </button>
           </div>
         </div>
       </div>
@@ -703,15 +694,6 @@ export const EvaluationForm: React.FC<Props> = ({
             className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 px-6 py-3.5 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm text-sm"
           >
             Lihat PDF
-          </button>
-          <button 
-            type="button" 
-            onClick={() => executeSave(true)}
-            disabled={isSubmitting}
-            className="w-full sm:w-auto bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 px-6 py-3.5 rounded-xl font-black transition-all shadow-sm text-sm active:scale-95 flex items-center justify-center gap-1.5"
-            title="Simpan data penilaian ini sebagai draf pada bila-bila masa"
-          >
-            <span>💾</span> Simpan Sebagai Draf
           </button>
           <button 
             type="submit" 
