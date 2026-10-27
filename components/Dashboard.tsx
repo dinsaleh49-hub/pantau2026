@@ -724,11 +724,6 @@ export const Dashboard: React.FC<Props> = ({
               <span className="text-[9px] font-bold text-indigo-500 bg-white px-1.5 py-0.5 rounded border border-indigo-100 uppercase">Jabatan Sahaja</span>
             </div>
           )}
-          {onRefresh && (
-            <button onClick={onRefresh} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm group">
-              <ArrowPathIcon className="h-4 w-4 text-indigo-600 group-active:animate-spin" /> Kemaskini Data
-            </button>
-          )}
           <button onClick={() => setShowGuideModal(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
             <InformationCircleIcon className="h-4 w-4 text-indigo-600" /> Panduan
           </button>
