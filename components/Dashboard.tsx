@@ -78,6 +78,7 @@ interface Props {
   userDept?: string;
   isRestrictedUser?: boolean;
   onStartEvaluation?: (preset?: { lecturerName?: string; department?: string; course?: string; code?: string; date?: string }) => void;
+  recentlySavedId?: string | null;
 }
 
 const DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1I5-K1Yv3SnFMBzUQtQnPzR82AeHWJqNw?usp=sharing";
@@ -98,6 +99,7 @@ export const Dashboard: React.FC<Props> = ({
   userRole,
   username,
   userDept,
+  recentlySavedId,
   onDeleteRecord,
   onDeleteLecturer,
   onDeleteSchedule,
@@ -213,12 +215,19 @@ export const Dashboard: React.FC<Props> = ({
   const filteredRecords = useMemo(() => {
     const baseList = isDeptView ? currentDeptRecords : records;
     const filterDept = isDeptView ? currentDept : recordsDeptFilter;
-    return baseList.filter(r => 
+    const filtered = baseList.filter(r => 
       r.lecturerName.toLowerCase().includes(searchTerm.toLowerCase()) &&
       (!onlyKJRecords || r.lecturerName.includes('(KJ)')) &&
       (filterDept === 'all' || r.department === filterDept)
     );
-  }, [records, currentDeptRecords, searchTerm, onlyKJRecords, recordsDeptFilter, isDeptView, currentDept]);
+    return [...filtered].sort((a, b) => {
+      if (recentlySavedId) {
+        if (a.id === recentlySavedId) return -1;
+        if (b.id === recentlySavedId) return 1;
+      }
+      return (b.timestamp || 0) - (a.timestamp || 0);
+    });
+  }, [records, currentDeptRecords, searchTerm, onlyKJRecords, recordsDeptFilter, isDeptView, currentDept, recentlySavedId]);
 
   const newLecturers = useMemo(() => {
     return allLecturers.filter(l => !LECTURERS.some(staticL => staticL.name.toLowerCase() === l.name.toLowerCase()));
@@ -1064,11 +1073,16 @@ export const Dashboard: React.FC<Props> = ({
                       const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
                       const hasBothSignatures = !!record.lecturerSignature && !!record.evaluatorSignature;
                       return (
-                        <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                        <tr key={record.id} className={`transition-all duration-300 ${recentlySavedId === record.id ? 'bg-emerald-50/80 border-l-4 border-l-emerald-500 shadow-sm' : 'hover:bg-slate-50'}`}>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-bold text-slate-800">{record.lecturerName}</p>
                               {record.lecturerName.includes('(KJ)') && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
+                              {recentlySavedId === record.id && (
+                                <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse shadow-sm">
+                                  ✨ Baru Disimpan
+                                </span>
+                              )}
                               {hasBothSignatures ? (
                                 <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-md border border-emerald-200">
                                   <CheckBadgeIcon className="h-3 w-3 text-emerald-600" /> 2 Tandatangan Disimpan
@@ -1079,7 +1093,14 @@ export const Dashboard: React.FC<Props> = ({
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-400 uppercase mt-1">{formatDate(record.date)} • {record.code} • <span className="text-indigo-600 font-black">SKOR: {avg}</span></p>
+                            <p className="text-[10px] text-slate-400 uppercase mt-1">
+                              {formatDate(record.date)} • {record.code} • <span className="text-indigo-600 font-black">SKOR: {avg}</span>
+                              {record.timestamp && (
+                                <span className="text-slate-400 font-normal ml-2 lowercase">
+                                  (disimpan {new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                                </span>
+                              )}
+                            </p>
                           </td>
                           <td className="px-6 py-4 flex justify-end items-center gap-1.5">
                             <button onClick={() => generatePDF(record, 'view')} className="flex items-center gap-1 px-2 py-1 bg-white border border-indigo-200 text-indigo-600 rounded text-xs font-bold hover:bg-indigo-50 transition-colors"><EyeIcon className="h-3.5 w-3.5" /> Lihat</button>

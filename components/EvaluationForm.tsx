@@ -10,7 +10,15 @@ import {
 import { EvaluationRecord, Criterion } from '../types';
 import { SignaturePad } from './SignaturePad';
 import { generatePDF } from '../services/pdfService';
-import { SparklesIcon, CheckBadgeIcon, PencilSquareIcon, ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { 
+  SparklesIcon, 
+  CheckBadgeIcon, 
+  PencilSquareIcon, 
+  ArrowPathIcon, 
+  TrashIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/react/24/outline';
 
 interface Props {
   onSubmit: (record: EvaluationRecord) => Promise<void> | void;
@@ -62,6 +70,66 @@ export const EvaluationForm: React.FC<Props> = ({
   const [lecturerSig, setLecturerSig] = useState<string>('');
   const [evaluatorSig, setEvaluatorSig] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [restoredFromDraft, setRestoredFromDraft] = useState(false);
+
+  // Restore draft if opening blank form and draft exists
+  useEffect(() => {
+    if (!initialData) {
+      try {
+        const savedDraft = localStorage.getItem('epantau_draft_active_form');
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed && (parsed.formData?.lecturerName || Object.keys(parsed.scores || {}).length > 0)) {
+            if (parsed.formData) setFormData(prev => ({ ...prev, ...parsed.formData }));
+            if (parsed.scores) setScores(parsed.scores);
+            if (parsed.itemRemarks) setItemRemarks(parsed.itemRemarks);
+            setRestoredFromDraft(true);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not parse draft:", e);
+      }
+    }
+  }, [initialData]);
+
+  // Auto-save form progress to localStorage
+  useEffect(() => {
+    if (!initialData && (formData.lecturerName || Object.keys(scores).length > 0 || formData.remarks)) {
+      try {
+        localStorage.setItem('epantau_draft_active_form', JSON.stringify({
+          formData,
+          scores,
+          itemRemarks,
+          savedAt: Date.now()
+        }));
+      } catch (e) {
+        console.warn("Could not save form draft:", e);
+      }
+    }
+  }, [formData, scores, itemRemarks, initialData]);
+
+  const handleResetDraft = () => {
+    try {
+      localStorage.removeItem('epantau_draft_active_form');
+    } catch {}
+    setFormData({
+      campus: CAMPUSES[0],
+      department: isAdmin ? '' : userDept,
+      lecturerName: '',
+      course: '',
+      code: '',
+      credit: '',
+      date: new Date().toISOString().split('T')[0],
+      evaluatorName: username || '',
+      remarks: ''
+    });
+    setScores({});
+    setItemRemarks({});
+    setLecturerSig('');
+    setEvaluatorSig('');
+    setRestoredFromDraft(false);
+    if (onNotification) onNotification('Borang penilaian telah dikosongkan untuk pengisian baharu.', 'success');
+  };
 
   useEffect(() => {
     if (initialData) {
@@ -242,6 +310,10 @@ export const EvaluationForm: React.FC<Props> = ({
     
     try {
       await onSubmit(record);
+      // Clean up auto-saved draft
+      try {
+        localStorage.removeItem('epantau_draft_active_form');
+      } catch {}
     } catch (error) {
       console.error("Error in onSubmit:", error);
       if (onNotification) {
@@ -296,6 +368,32 @@ export const EvaluationForm: React.FC<Props> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      {restoredFromDraft && !initialData && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-900 shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-200/80 flex items-center justify-center text-indigo-700 shrink-0">
+              <ArrowPathIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-indigo-900">
+                Maklumat Penilaian Terdahulu Dipulihkan Secara Automatik
+              </p>
+              <p className="text-[11px] text-indigo-700 font-medium">
+                Sistem telah menyimpan draf kerja terdahulu anda supaya data tidak hilang semasa halaman dimuatkan semula.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetDraft}
+            className="px-3.5 py-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 active:scale-95"
+            title="Padam draf dan kosongkan semula borang"
+          >
+            Kosongkan Semula
+          </button>
+        </div>
+      )}
+
       {initialData && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-amber-900 shadow-sm animate-in fade-in">
           <div className="flex items-center gap-3">
@@ -496,9 +594,9 @@ export const EvaluationForm: React.FC<Props> = ({
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-700">Kemajuan Penilaian Kriteria:</span>
-              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-700">Kemajuan Penilaian:</span>
+              <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
                 EVALUATION_CRITERIA.filter(c => !!scores[c.id]).length === EVALUATION_CRITERIA.length 
                   ? 'bg-emerald-100 text-emerald-800' 
                   : 'bg-amber-100 text-amber-800'
@@ -507,13 +605,17 @@ export const EvaluationForm: React.FC<Props> = ({
               </span>
               {Object.keys(scores).length > 0 && (
                 <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
-                  Purata Skor Semasa: {(Object.values(scores).reduce((a, b) => a + b, 0) / Object.keys(scores).length).toFixed(2)}
+                  Purata Skor: {(Object.values(scores).reduce((a, b) => a + b, 0) / Object.keys(scores).length).toFixed(2)} / 5.00
                 </span>
               )}
             </div>
-            <div className="w-full sm:w-80 bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
+            <div className="w-full sm:w-80 bg-slate-100 h-2.5 rounded-full overflow-hidden mt-2">
               <div 
-                className="bg-indigo-600 h-full transition-all duration-300"
+                className={`h-full transition-all duration-300 ${
+                  EVALUATION_CRITERIA.filter(c => !!scores[c.id]).length === EVALUATION_CRITERIA.length
+                    ? 'bg-emerald-500'
+                    : 'bg-indigo-600'
+                }`}
                 style={{ width: `${(EVALUATION_CRITERIA.filter(c => !!scores[c.id]).length / EVALUATION_CRITERIA.length) * 100}%` }}
               />
             </div>
@@ -549,6 +651,49 @@ export const EvaluationForm: React.FC<Props> = ({
             )}
           </div>
         </div>
+
+        {/* Missing Criteria Interactive Navigation */}
+        {(() => {
+          const missing = EVALUATION_CRITERIA.filter(c => !scores[c.id]);
+          if (missing.length === 0) {
+            return (
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs font-bold text-emerald-700 bg-emerald-50/70 p-2.5 rounded-xl">
+                <CheckBadgeIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Semua 16 kriteria lengkap dinilai! Rekod sedia untuk disimpan ke sistem.</span>
+              </div>
+            );
+          }
+          if (missing.length < EVALUATION_CRITERIA.length) {
+            return (
+              <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
+                <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
+                  <span>⚠️</span> Belum Dinilai ({missing.length}):
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {missing.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById(`criterion-${c.id}`);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          el.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50/50');
+                          setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/50'), 2500);
+                        }
+                      }}
+                      className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-md text-[10px] font-mono font-bold transition-colors cursor-pointer"
+                      title={`Klik untuk pergi ke kriteria ${c.id}: ${c.text}`}
+                    >
+                      {c.id}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       <div className="space-y-8">
@@ -703,12 +848,12 @@ export const EvaluationForm: React.FC<Props> = ({
             {isSubmitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Menyimpan Rekod...
+                Menyimpan Rekod ke Pelayan...
               </>
             ) : (
               <>
                 <CheckBadgeIcon className="h-5 w-5" />
-                {initialData ? 'Kemaskini Rekod Penilaian' : 'Simpan Rekod Penilaian'}
+                {initialData ? 'Kemaskini & Simpan Rekod' : 'Simpan Rekod Penilaian'}
               </>
             )}
           </button>

@@ -3,6 +3,7 @@ import { EvaluationForm } from './components/EvaluationForm';
 import { Dashboard } from './components/Dashboard';
 import { Login } from './components/Login';
 import { UserGuideModal } from './components/UserGuideModal';
+import { SavedRecordSuccessModal } from './components/SavedRecordSuccessModal';
 import { EvaluationRecord, MonitoringSchedule } from './types';
 import { INITIAL_RECORDS, INITIAL_SCHEDULES, INITIAL_SIGNATURES, LECTURERS, CAMPUSES } from './constants';
 import { 
@@ -77,6 +78,8 @@ const App: React.FC = () => {
   const [view, setView] = useState<'dashboard' | 'form'>('dashboard');
   const [editingRecord, setEditingRecord] = useState<EvaluationRecord | null>(null);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [recentlySavedId, setRecentlySavedId] = useState<string | null>(null);
+  const [savedSuccessModal, setSavedSuccessModal] = useState<EvaluationRecord | null>(null);
   const isInitialLoad = useRef(true);
   
   const [records, setRecords] = useState<EvaluationRecord[]>(() => {
@@ -573,7 +576,11 @@ const App: React.FC = () => {
     setIsLocalUpdate(prev => ({ ...prev, records: true }));
     
     const trimmedName = record.lecturerName.trim();
-    const normalizedRecord = { ...record, lecturerName: trimmedName };
+    const normalizedRecord = { 
+      ...record, 
+      lecturerName: trimmedName,
+      timestamp: record.timestamp || Date.now()
+    };
     
     // Save both signatures to persistent library so they are never lost
     if (record.lecturerSignature && trimmedName) {
@@ -600,30 +607,56 @@ const App: React.FC = () => {
       ? records.map(r => r.id === record.id ? normalizedRecord : r)
       : [normalizedRecord, ...records];
 
-    const updatedSchedules = schedules.map(s => (
-      s.lecturerName.toLowerCase() === normalizedRecord.lecturerName.toLowerCase() && 
-      s.department === normalizedRecord.department &&
-      s.date === normalizedRecord.date
-    ) ? { ...s, status: 'Completed' as const } : s);
+    // Smart schedule matching: match by lecturer name case-insensitively, and mark completed if date matches or pending
+    const updatedSchedules = schedules.map(s => {
+      const isLecturerMatch = s.lecturerName.trim().toLowerCase() === trimmedName.toLowerCase();
+      if (!isLecturerMatch) return s;
+      if (s.date === normalizedRecord.date || s.status === 'Pending') {
+        return { ...s, status: 'Completed' as const };
+      }
+      return s;
+    });
 
-    // Update state
+    // Update state immediately
     setLecturersList(updatedLecturers);
     setRecords(updatedRecords);
     setSchedules(updatedSchedules);
+    setRecentlySavedId(normalizedRecord.id);
 
-    // Sync
-    const success = await syncData(updatedRecords, updatedSchedules, updatedLecturers);
+    // Fast direct upsert to server endpoint for instant persistence
+    try {
+      await fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upsert_record', record: normalizedRecord })
+      });
+      console.log("[App] Direct upsert to server succeeded for:", normalizedRecord.id);
+    } catch (upsertErr) {
+      console.warn("[App] Direct upsert to server warning (will be resolved by syncData):", upsertErr);
+    }
+
+    // Clear temporary in-progress form draft from storage
+    try {
+      localStorage.removeItem('epantau_draft_active_form');
+      sessionStorage.removeItem('epantau_draft_active_form');
+    } catch {}
+
+    // Full sync in background
+    syncData(updatedRecords, updatedSchedules, updatedLecturers).catch(console.error);
     
+    const scoreVals = Object.values(normalizedRecord.scores || {}) as number[];
+    const avgScore = scoreVals.length > 0 ? (scoreVals.reduce((a, b) => a + b, 0) / scoreVals.length).toFixed(2) : '-';
+
     if (isEdit) {
-      showNotification(`Rekod pemantauan untuk ${trimmedName} telah berjaya dikemaskini!`, 'success');
+      showNotification(`Rekod penilaian ${trimmedName} berjaya dikemaskini (Skor: ${avgScore})!`, 'success');
     } else if (normalizedRecord.lecturerSignature && normalizedRecord.evaluatorSignature) {
-      showNotification(`Rekod penilaian untuk ${trimmedName} dan kedua-dua tandatangan berjaya disimpan!`, 'success');
-    } else if (normalizedRecord.evaluatorSignature) {
-      showNotification(`Rekod penilaian untuk ${trimmedName} berjaya disimpan! (Status: Menunggu tandatangan pensyarah)`, 'success');
+      showNotification(`Rekod penilaian ${trimmedName} dan kedua-dua tandatangan berjaya disimpan (Skor: ${avgScore})!`, 'success');
     } else {
-      showNotification(`Draf rekod penilaian untuk ${trimmedName} telah selamat disimpan!`, 'success');
+      showNotification(`Rekod penilaian ${trimmedName} berjaya disimpan (Skor: ${avgScore})!`, 'success');
     }
     
+    // Show success dialog with quick actions (View/Print PDF, Download PDF, Next evaluation)
+    setSavedSuccessModal(normalizedRecord);
     setEditingRecord(null);
     setView('dashboard');
   };
@@ -987,6 +1020,7 @@ const App: React.FC = () => {
             onUpdateLecturer={handleUpdateLecturer}
             onRefresh={() => fetchData()}
             lastSync={lastSync}
+            recentlySavedId={recentlySavedId}
           />
         ) : (
           <div className="max-w-4xl mx-auto">
@@ -1027,6 +1061,16 @@ const App: React.FC = () => {
       <UserGuideModal 
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}
+      />
+
+      <SavedRecordSuccessModal 
+        record={savedSuccessModal}
+        isOpen={!!savedSuccessModal}
+        onClose={() => setSavedSuccessModal(null)}
+        onNewEvaluation={() => {
+          setSavedSuccessModal(null);
+          handleStartEvaluation();
+        }}
       />
 
       {/* Notification Toast */}

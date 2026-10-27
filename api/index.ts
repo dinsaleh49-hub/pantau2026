@@ -314,12 +314,17 @@ const postRecords = async (req: any, res: any) => {
         currentRecords = JSON.parse(fs.readFileSync(RECORDS_FILE, 'utf-8'));
       } catch {}
     }
+    if (currentRecords.length === 0 && fs.existsSync(INITIAL_RECORDS_FILE)) {
+      try {
+        currentRecords = JSON.parse(fs.readFileSync(INITIAL_RECORDS_FILE, 'utf-8'));
+      } catch {}
+    }
 
     const recIdx = currentRecords.findIndex((r: any) => r.id === singleRecord.id);
     if (recIdx !== -1) {
       currentRecords[recIdx] = singleRecord;
     } else {
-      currentRecords.push(singleRecord);
+      currentRecords.unshift(singleRecord);
     }
 
     if (supabase) {
