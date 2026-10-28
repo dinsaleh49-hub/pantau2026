@@ -18,13 +18,15 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onNewEvaluation: () => void;
+  isEdit?: boolean;
 }
 
 export const SavedRecordSuccessModal: React.FC<Props> = ({
   record,
   isOpen,
   onClose,
-  onNewEvaluation
+  onNewEvaluation,
+  isEdit = false
 }) => {
   if (!isOpen || !record) return null;
 
@@ -54,14 +56,29 @@ export const SavedRecordSuccessModal: React.FC<Props> = ({
       {/* Modal Dialog */}
       <div className="relative bg-white rounded-3xl border border-slate-200 max-w-lg w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
         {/* Top Header Banner */}
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 text-white flex items-center justify-between">
+        <div className={`px-6 py-5 text-white flex items-center justify-between ${
+          isEdit 
+            ? 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600' 
+            : 'bg-gradient-to-r from-emerald-600 to-teal-600'
+        }`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
               <CheckCircleIcon className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-black tracking-tight">Penilaian Berjaya Disimpan</h3>
-              <p className="text-xs text-emerald-100 font-medium">Rekod pemantauan pensyarah kini selamat dalam sistem</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black tracking-tight">
+                  {isEdit ? 'Rekod Penilaian Berjaya Dikemaskini' : 'Penilaian Baharu Berjaya Disimpan'}
+                </h3>
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30">
+                  {isEdit ? 'Dikemaskini' : 'Baru'}
+                </span>
+              </div>
+              <p className="text-xs text-emerald-100 font-medium">
+                {isEdit 
+                  ? 'Perubahan skor, ulasan dan maklumat telah selamat disimpan ke sistem' 
+                  : 'Rekod pemantauan pensyarah kini selamat dalam sistem'}
+              </p>
             </div>
           </div>
           <button 

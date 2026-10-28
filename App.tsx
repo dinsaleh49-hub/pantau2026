@@ -79,7 +79,8 @@ const App: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<EvaluationRecord | null>(null);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [recentlySavedId, setRecentlySavedId] = useState<string | null>(null);
-  const [savedSuccessModal, setSavedSuccessModal] = useState<EvaluationRecord | null>(null);
+  const [recentlySavedAction, setRecentlySavedAction] = useState<'created' | 'updated' | null>(null);
+  const [savedSuccessModal, setSavedSuccessModal] = useState<{ record: EvaluationRecord; isEdit: boolean } | null>(null);
   const isInitialLoad = useRef(true);
   
   const [records, setRecords] = useState<EvaluationRecord[]>(() => {
@@ -519,15 +520,20 @@ const App: React.FC = () => {
   const syncData = async (
     updatedRecords: EvaluationRecord[], 
     updatedSchedules: MonitoringSchedule[], 
-    updatedLecturers: Lecturer[]
+    updatedLecturers: Lecturer[],
+    options?: { syncRecords?: boolean; syncSchedules?: boolean; syncLecturers?: boolean }
   ) => {
-    console.log(`[Sync] Starting sync. Records: ${updatedRecords.length}, Schedules: ${updatedSchedules.length}, Lecturers: ${updatedLecturers.length}`);
+    const doRecords = options?.syncRecords !== false;
+    const doSchedules = options?.syncSchedules !== false;
+    const doLecturers = options?.syncLecturers !== false;
+
+    console.log(`[Sync] Starting sync. Records: ${doRecords ? updatedRecords.length : 'skip'}, Schedules: ${doSchedules ? updatedSchedules.length : 'skip'}, Lecturers: ${doLecturers ? updatedLecturers.length : 'skip'}`);
     
     // Update localStorage immediately with quota protection
     try {
-      localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
-      localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
-      localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+      if (doRecords) localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
+      if (doSchedules) localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+      if (doLecturers) localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
     } catch (storageError) {
       console.warn("[Sync] LocalStorage write error (quota reached), relying on server sync:", storageError);
     }
@@ -535,7 +541,6 @@ const App: React.FC = () => {
     try {
       setIsSyncing(true);
       
-      // Perform requests sequentially or with better error tracking
       const syncRequest = async (path: string, data: any) => {
         const res = await fetch(path, {
           method: 'POST',
@@ -549,14 +554,19 @@ const App: React.FC = () => {
         return res.json();
       };
 
-      await Promise.all([
-        syncRecordsToServerSafely(updatedRecords),
-        syncRequest('/api/lecturers', updatedLecturers),
-        syncRequest('/api/schedules', updatedSchedules)
-      ]);
+      const tasks: Promise<any>[] = [];
+      if (doRecords) tasks.push(syncRecordsToServerSafely(updatedRecords));
+      if (doLecturers) tasks.push(syncRequest('/api/lecturers', updatedLecturers));
+      if (doSchedules) tasks.push(syncRequest('/api/schedules', updatedSchedules));
+
+      await Promise.all(tasks);
 
       console.log("[Sync] Sync successful.");
-      setIsLocalUpdate({ records: false, schedules: false, lecturers: false });
+      setIsLocalUpdate(prev => ({
+        records: doRecords ? false : prev.records,
+        schedules: doSchedules ? false : prev.schedules,
+        lecturers: doLecturers ? false : prev.lecturers
+      }));
       setSyncError(null);
       setLastSync(new Date());
       return true;
@@ -572,17 +582,17 @@ const App: React.FC = () => {
 
   const handleAddRecord = async (record: EvaluationRecord) => {
     console.log("[App] handleAddRecord called", record.id);
-    // Set local update flag immediately
     setIsLocalUpdate(prev => ({ ...prev, records: true }));
     
     const trimmedName = record.lecturerName.trim();
-    const normalizedRecord = { 
+    const isEdit = records.some(r => r.id === record.id);
+    const normalizedRecord: EvaluationRecord = { 
       ...record, 
       lecturerName: trimmedName,
-      timestamp: record.timestamp || Date.now()
+      timestamp: isEdit ? Date.now() : (record.timestamp || Date.now())
     };
     
-    // Save both signatures to persistent library so they are never lost
+    // Save both signatures to persistent library
     if (record.lecturerSignature && trimmedName) {
       handleSaveSignature(trimmedName, record.lecturerSignature);
     }
@@ -590,7 +600,7 @@ const App: React.FC = () => {
       handleSaveSignature(record.evaluatorName.trim(), record.evaluatorSignature);
     }
     
-    // Update local states first for immediate UI feedback
+    // Update local lecturers list if new or department changed
     const updatedLecturers = [...lecturersList];
     const existingLecturerIndex = updatedLecturers.findIndex(l => l.name.toLowerCase() === trimmedName.toLowerCase());
     
@@ -602,9 +612,9 @@ const App: React.FC = () => {
       updatedLecturers.push({ name: trimmedName, department: record.department });
     }
     
-    const isEdit = records.some(r => r.id === record.id);
+    // Put newly added or updated record at index 0 so it's always at the top
     const updatedRecords = isEdit
-      ? records.map(r => r.id === record.id ? normalizedRecord : r)
+      ? [normalizedRecord, ...records.filter(r => r.id !== record.id)]
       : [normalizedRecord, ...records];
 
     // Smart schedule matching: match by lecturer name case-insensitively, and mark completed if date matches or pending
@@ -617,11 +627,21 @@ const App: React.FC = () => {
       return s;
     });
 
-    // Update state immediately
+    // Update state immediately for instant responsive feedback
     setLecturersList(updatedLecturers);
     setRecords(updatedRecords);
     setSchedules(updatedSchedules);
     setRecentlySavedId(normalizedRecord.id);
+    setRecentlySavedAction(isEdit ? 'updated' : 'created');
+
+    // Immediate local persistence
+    try {
+      localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
+      localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+      localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+    } catch (lsErr) {
+      console.warn("LocalStorage immediate write error:", lsErr);
+    }
 
     // Fast direct upsert to server endpoint for instant persistence
     try {
@@ -648,15 +668,15 @@ const App: React.FC = () => {
     const avgScore = scoreVals.length > 0 ? (scoreVals.reduce((a, b) => a + b, 0) / scoreVals.length).toFixed(2) : '-';
 
     if (isEdit) {
-      showNotification(`Rekod penilaian ${trimmedName} berjaya dikemaskini (Skor: ${avgScore})!`, 'success');
+      showNotification(`Rekod penilaian ${trimmedName} berjaya dikemaskini dan disimpan (Skor: ${avgScore})!`, 'success');
     } else if (normalizedRecord.lecturerSignature && normalizedRecord.evaluatorSignature) {
-      showNotification(`Rekod penilaian ${trimmedName} dan kedua-dua tandatangan berjaya disimpan (Skor: ${avgScore})!`, 'success');
+      showNotification(`Rekod penilaian baharu ${trimmedName} dan kedua-dua tandatangan berjaya disimpan (Skor: ${avgScore})!`, 'success');
     } else {
-      showNotification(`Rekod penilaian ${trimmedName} berjaya disimpan (Skor: ${avgScore})!`, 'success');
+      showNotification(`Rekod penilaian baharu ${trimmedName} berjaya disimpan (Skor: ${avgScore})!`, 'success');
     }
     
     // Show success dialog with quick actions (View/Print PDF, Download PDF, Next evaluation)
-    setSavedSuccessModal(normalizedRecord);
+    setSavedSuccessModal({ record: normalizedRecord, isEdit });
     setEditingRecord(null);
     setView('dashboard');
   };
@@ -695,16 +715,46 @@ const App: React.FC = () => {
     const updatedSchedules = [schedule, ...schedules];
     setSchedules(updatedSchedules);
     setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
-    await syncData(records, updatedSchedules, lecturersList);
-    showNotification('Jadual pemantauan telah berjaya didaftarkan.');
+    
+    try {
+      localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+    } catch (e) {}
+
+    try {
+      await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upsert_schedule', schedule })
+      });
+    } catch (e) {
+      console.warn("Direct schedule upsert error:", e);
+    }
+
+    syncData(records, updatedSchedules, lecturersList, { syncRecords: false, syncSchedules: true, syncLecturers: false }).catch(console.error);
+    showNotification(`Jadual pemantauan baharu (${schedule.lecturerName}) telah berjaya didaftarkan dan disimpan.`, 'success');
   };
 
   const handleUpdateSchedule = async (updatedSchedule: MonitoringSchedule) => {
     const updatedSchedules = schedules.map((s: MonitoringSchedule) => s.id === updatedSchedule.id ? updatedSchedule : s);
     setSchedules(updatedSchedules);
     setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
-    await syncData(records, updatedSchedules, lecturersList);
-    showNotification('Jadual pemantauan telah berjaya dikemaskini.');
+    
+    try {
+      localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+    } catch (e) {}
+
+    try {
+      await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upsert_schedule', schedule: updatedSchedule })
+      });
+    } catch (e) {
+      console.warn("Direct schedule update error:", e);
+    }
+
+    syncData(records, updatedSchedules, lecturersList, { syncRecords: false, syncSchedules: true, syncLecturers: false }).catch(console.error);
+    showNotification(`Jadual pemantauan (${updatedSchedule.lecturerName}) telah berjaya dikemaskini dan disimpan.`, 'success');
   };
 
   const handleEditRecord = (record: EvaluationRecord) => {
@@ -732,9 +782,25 @@ const App: React.FC = () => {
     setRecords(updatedRecords);
     setSchedules(updatedSchedules);
     
+    try {
+      localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+      localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
+      localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+    } catch (e) {}
+
+    try {
+      await fetch('/api/lecturers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upsert_lecturer', lecturer: updatedLecturer, oldName, oldDept })
+      });
+    } catch (e) {
+      console.warn("Direct lecturer update error:", e);
+    }
+
     setIsLocalUpdate({ records: true, schedules: true, lecturers: true });
-    await syncData(updatedRecords, updatedSchedules, updatedLecturers);
-    showNotification('Maklumat pensyarah telah berjaya dikemaskini.');
+    syncData(updatedRecords, updatedSchedules, updatedLecturers).catch(console.error);
+    showNotification(`Maklumat pensyarah (${updatedLecturer.name}) telah berjaya dikemaskini dan disimpan.`, 'success');
   };
 
   const handleAddLecturer = async (lecturer: Lecturer) => {
@@ -752,8 +818,23 @@ const App: React.FC = () => {
     const updatedLecturers = [...lecturersList, lecturer];
     setLecturersList(updatedLecturers);
     setIsLocalUpdate(prev => ({ ...prev, lecturers: true }));
-    await syncData(records, schedules, updatedLecturers);
-    showNotification('Pensyarah baru telah berjaya ditambah.');
+    
+    try {
+      localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+    } catch (e) {}
+
+    try {
+      await fetch('/api/lecturers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upsert_lecturer', lecturer })
+      });
+    } catch (e) {
+      console.warn("Direct lecturer upsert error:", e);
+    }
+
+    syncData(records, schedules, updatedLecturers, { syncRecords: false, syncSchedules: false, syncLecturers: true }).catch(console.error);
+    showNotification(`Pensyarah baharu (${lecturer.name}) telah berjaya didaftarkan dan disimpan.`, 'success');
   };
 
   const openDeleteRecordConfirm = (id: string) => {
@@ -1021,6 +1102,7 @@ const App: React.FC = () => {
             onRefresh={() => fetchData()}
             lastSync={lastSync}
             recentlySavedId={recentlySavedId}
+            recentlySavedAction={recentlySavedAction}
           />
         ) : (
           <div className="max-w-4xl mx-auto">
@@ -1064,7 +1146,8 @@ const App: React.FC = () => {
       />
 
       <SavedRecordSuccessModal 
-        record={savedSuccessModal}
+        record={savedSuccessModal?.record || null}
+        isEdit={savedSuccessModal?.isEdit}
         isOpen={!!savedSuccessModal}
         onClose={() => setSavedSuccessModal(null)}
         onNewEvaluation={() => {

@@ -295,10 +295,11 @@ export const EvaluationForm: React.FC<Props> = ({
       }
     }
 
+    const isEdit = !!initialData?.id;
     const record: EvaluationRecord = {
       ...formData,
       id: initialData?.id || Math.random().toString(36).substr(2, 9),
-      timestamp: initialData?.timestamp || Date.now(),
+      timestamp: isEdit ? Date.now() : (initialData?.timestamp || Date.now()),
       scores,
       itemRemarks,
       remarks: formData.remarks,

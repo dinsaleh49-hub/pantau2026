@@ -444,7 +444,47 @@ const getSchedules = async (req: any, res: any) => {
 };
 
 const postSchedules = async (req: any, res: any) => {
-  const schedules = req.body;
+  const body = req.body;
+
+  // Single schedule upsert/update (fast and direct)
+  if (body && body.action === 'upsert_schedule' && body.schedule) {
+    const single = body.schedule;
+    console.log(`[API] POST /api/schedules - Direct upsert for schedule ID: ${single.id} (${single.lecturerName})`);
+    let currentSchedules: any[] = [];
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('epantau_storage').select('content').eq('id', 'schedules').maybeSingle();
+        if (Array.isArray(data?.content)) currentSchedules = [...data.content];
+      } catch (err) {}
+    }
+    if (currentSchedules.length === 0 && fs.existsSync(SCHEDULES_FILE)) {
+      try { currentSchedules = JSON.parse(fs.readFileSync(SCHEDULES_FILE, 'utf-8')); } catch {}
+    }
+    if (currentSchedules.length === 0 && fs.existsSync(INITIAL_SCHEDULES_FILE)) {
+      try { currentSchedules = JSON.parse(fs.readFileSync(INITIAL_SCHEDULES_FILE, 'utf-8')); } catch {}
+    }
+
+    const idx = currentSchedules.findIndex((s: any) => s.id === single.id);
+    if (idx !== -1) {
+      currentSchedules[idx] = single;
+    } else {
+      currentSchedules.unshift(single);
+    }
+
+    if (supabase) {
+      try {
+        await supabase.from('epantau_storage').upsert({ id: 'schedules', content: currentSchedules, updated_at: new Date() });
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+    if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+      try { fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(currentSchedules, null, 2)); } catch {}
+    }
+    return res.json({ success: true, count: currentSchedules.length });
+  }
+
+  const schedules = body;
   const count = Array.isArray(schedules) ? schedules.length : 0;
   console.log(`[API] POST /api/schedules - Saving ${count} schedules...`);
 
@@ -503,7 +543,52 @@ const getLecturers = async (req: any, res: any) => {
 };
 
 const postLecturers = async (req: any, res: any) => {
-  const lecturers = req.body;
+  const body = req.body;
+
+  // Single lecturer upsert/update (fast and direct)
+  if (body && body.action === 'upsert_lecturer' && body.lecturer) {
+    const single = body.lecturer;
+    const oldName = body.oldName || single.name;
+    const oldDept = body.oldDept || single.department;
+    console.log(`[API] POST /api/lecturers - Direct upsert for lecturer: ${single.name} (${single.department})`);
+    let currentLecturers: any[] = [];
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('epantau_storage').select('content').eq('id', 'lecturers').maybeSingle();
+        if (Array.isArray(data?.content)) currentLecturers = [...data.content];
+      } catch (err) {}
+    }
+    if (currentLecturers.length === 0 && fs.existsSync(LECTURERS_FILE)) {
+      try { currentLecturers = JSON.parse(fs.readFileSync(LECTURERS_FILE, 'utf-8')); } catch {}
+    }
+    if (currentLecturers.length === 0 && fs.existsSync(INITIAL_LECTURERS_FILE)) {
+      try { currentLecturers = JSON.parse(fs.readFileSync(INITIAL_LECTURERS_FILE, 'utf-8')); } catch {}
+    }
+
+    const idx = currentLecturers.findIndex((l: any) => 
+      (l.name.toLowerCase() === oldName.toLowerCase() && l.department === oldDept) ||
+      (l.name.toLowerCase() === single.name.toLowerCase() && l.department === single.department)
+    );
+    if (idx !== -1) {
+      currentLecturers[idx] = single;
+    } else {
+      currentLecturers.push(single);
+    }
+
+    if (supabase) {
+      try {
+        await supabase.from('epantau_storage').upsert({ id: 'lecturers', content: currentLecturers, updated_at: new Date() });
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+    if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+      try { fs.writeFileSync(LECTURERS_FILE, JSON.stringify(currentLecturers, null, 2)); } catch {}
+    }
+    return res.json({ success: true, count: currentLecturers.length });
+  }
+
+  const lecturers = body;
   const count = Array.isArray(lecturers) ? lecturers.length : 0;
   console.log(`[API] POST /api/lecturers - Saving ${count} lecturers...`);
 

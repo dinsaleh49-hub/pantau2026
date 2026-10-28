@@ -79,6 +79,7 @@ interface Props {
   isRestrictedUser?: boolean;
   onStartEvaluation?: (preset?: { lecturerName?: string; department?: string; course?: string; code?: string; date?: string }) => void;
   recentlySavedId?: string | null;
+  recentlySavedAction?: 'created' | 'updated' | null;
 }
 
 const DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1I5-K1Yv3SnFMBzUQtQnPzR82AeHWJqNw?usp=sharing";
@@ -100,6 +101,7 @@ export const Dashboard: React.FC<Props> = ({
   username,
   userDept,
   recentlySavedId,
+  recentlySavedAction,
   onDeleteRecord,
   onDeleteLecturer,
   onDeleteSchedule,
@@ -1073,14 +1075,22 @@ export const Dashboard: React.FC<Props> = ({
                       const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
                       const hasBothSignatures = !!record.lecturerSignature && !!record.evaluatorSignature;
                       return (
-                        <tr key={record.id} className={`transition-all duration-300 ${recentlySavedId === record.id ? 'bg-emerald-50/80 border-l-4 border-l-emerald-500 shadow-sm' : 'hover:bg-slate-50'}`}>
+                        <tr key={record.id} className={`transition-all duration-300 ${
+                          recentlySavedId === record.id 
+                            ? (recentlySavedAction === 'updated' 
+                                ? 'bg-indigo-50/80 border-l-4 border-l-indigo-600 shadow-sm' 
+                                : 'bg-emerald-50/80 border-l-4 border-l-emerald-500 shadow-sm') 
+                            : 'hover:bg-slate-50'
+                        }`}>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-bold text-slate-800">{record.lecturerName}</p>
                               {record.lecturerName.includes('(KJ)') && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
                               {recentlySavedId === record.id && (
-                                <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse shadow-sm">
-                                  ✨ Baru Disimpan
+                                <span className={`text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse shadow-sm ${
+                                  recentlySavedAction === 'updated' ? 'bg-indigo-600' : 'bg-emerald-600'
+                                }`}>
+                                  {recentlySavedAction === 'updated' ? '🔄 Berjaya Dikemaskini' : '✨ Baru Disimpan'}
                                 </span>
                               )}
                               {hasBothSignatures ? (
