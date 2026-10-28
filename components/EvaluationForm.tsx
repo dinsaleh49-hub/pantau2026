@@ -820,17 +820,6 @@ export const EvaluationForm: React.FC<Props> = ({
               {initialData ? 'Batal Pengemaskinian' : 'Batal'}
             </button>
           )}
-          {initialData && onDeleteRecord && (
-            <button 
-              type="button" 
-              onClick={() => onDeleteRecord(initialData.id)}
-              className="w-full sm:w-auto px-5 py-3.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold transition-all text-sm shadow-sm flex items-center justify-center gap-2 active:scale-95"
-              title="Padam rekod pemantauan pensyarah ini jika berlaku sebarang kesilapan"
-            >
-              <TrashIcon className="w-4 h-4 text-rose-600" />
-              Padam Rekod (Kesilapan)
-            </button>
-          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3 w-full sm:w-auto">
