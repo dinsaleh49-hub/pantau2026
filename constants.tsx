@@ -135,7 +135,7 @@ export const LECTURERS = [
 { name: 'Sharon Vijaya a/p Balakrishnan',	department: 'Jabatan Bahasa' },
 { name: 'Sheela Devi a/p Veerasamy',	department: 'Jabatan Bahasa' },
 { name: 'Sohaini binti Rejab',	department:	'Jabatan Pengajian Melayu' },
-{ name: 'Su Yit Mun',	department:	'Jabatan Bahasa' },
+{ name: 'Su Yit Mun',	department:	'Jabatan Ilmu Pendidikan' },
 { name: 'Suzana binti Harun (KJ)',	department:	'Jabatan Pendidikan Islam' },
 { name: 'Tan Sok Phiaw',	department:	'Jabatan Pengajian Melayu' },
 { name: 'Tan Soo Hun',	department:	'Jabatan Sains Sosial' },
