@@ -66,6 +66,7 @@ interface Props {
   userRole: 'admin' | 'user';
   username?: string;
   onDeleteRecord: (id: string) => void;
+  onDeleteMultipleRecords?: (recordIds: string[]) => void;
   onDeleteLecturer: (name: string, department: string) => void;
   onDeleteMultipleLecturers?: (lecturers: { name: string; department: string }[]) => void;
   onDeleteSchedule: (id: string) => void;
@@ -104,6 +105,7 @@ export const Dashboard: React.FC<Props> = ({
   recentlySavedId,
   recentlySavedAction,
   onDeleteRecord,
+  onDeleteMultipleRecords,
   onDeleteLecturer,
   onDeleteMultipleLecturers,
   onDeleteSchedule,
@@ -212,6 +214,53 @@ export const Dashboard: React.FC<Props> = ({
       targets.forEach(t => onDeleteLecturer(t.name, t.department));
     }
     setSelectedLecturerKeys(new Set());
+  };
+
+  // Checkbox selection state for evaluation records (record ID)
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectRecord = (id: string) => {
+    setSelectedRecordIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllRecords = (displayedRecords: EvaluationRecord[]) => {
+    const visibleIds = displayedRecords.map(r => r.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedRecordIds.has(id));
+    setSelectedRecordIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach(id => next.delete(id));
+      } else {
+        visibleIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleBatchDeleteRecords = () => {
+    if (selectedRecordIds.size === 0) return;
+    const ids = Array.from(selectedRecordIds);
+    if (onDeleteMultipleRecords) {
+      onDeleteMultipleRecords(ids);
+    } else {
+      ids.forEach(id => onDeleteRecord(id));
+    }
+    setSelectedRecordIds(new Set());
+  };
+
+  const handleEditSelectedRecord = () => {
+    if (selectedRecordIds.size === 0) return;
+    const firstId = Array.from(selectedRecordIds)[0];
+    const target = records.find(r => r.id === firstId);
+    if (target) {
+      onEditRecord(target);
+      setSelectedRecordIds(new Set());
+    }
   };
 
   // Lecturers, Records, and Schedules strictly scoped when viewing a department
@@ -1108,9 +1157,55 @@ export const Dashboard: React.FC<Props> = ({
                   </label>
                 </div>
              </div>
+             {selectedRecordIds.size > 0 && (
+               <div className="mb-4 p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                 <div className="flex items-center gap-2">
+                   <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
+                   <span className="text-xs font-bold text-indigo-900">
+                     {selectedRecordIds.size} rekod penilaian dipilih
+                   </span>
+                 </div>
+                 <div className="flex items-center gap-2 flex-wrap">
+                   <button
+                     onClick={() => setSelectedRecordIds(new Set())}
+                     className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                   >
+                     Batal Pilihan
+                   </button>
+                   <button
+                     onClick={handleEditSelectedRecord}
+                     className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all active:scale-95"
+                     title={selectedRecordIds.size === 1 ? 'Kemaskini rekod penilaian ini' : 'Kemaskini rekod penilaian pertama yang dipilih'}
+                   >
+                     <PencilSquareIcon className="h-4 w-4" /> Kemaskini Rekod {selectedRecordIds.size > 1 ? '(Pertama)' : ''}
+                   </button>
+                   <button
+                     onClick={handleBatchDeleteRecords}
+                     className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all active:scale-95"
+                     title="Padam semua rekod penilaian yang dipilih secara kekal"
+                   >
+                     <TrashIcon className="h-4 w-4" /> Padam Rekod Dipilih ({selectedRecordIds.size})
+                   </button>
+                 </div>
+               </div>
+             )}
              <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead><tr className="bg-slate-50/50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px] tracking-widest"><th className="px-6 py-3">Maklumat Telah Dipantau</th><th className="px-6 py-3 text-right">Tindakan</th></tr></thead>
+                  <thead>
+                    <tr className="bg-slate-50/50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px] tracking-widest">
+                      <th className="w-12 px-4 py-3 text-center">
+                        <input 
+                          type="checkbox"
+                          checked={filteredRecords.length > 0 && filteredRecords.every(r => selectedRecordIds.has(r.id))}
+                          onChange={() => toggleSelectAllRecords(filteredRecords)}
+                          className="h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                          title="Pilih Semua Rekod"
+                        />
+                      </th>
+                      <th className="px-6 py-3">Maklumat Telah Dipantau</th>
+                      <th className="px-6 py-3 text-right">Tindakan</th>
+                    </tr>
+                  </thead>
                   <tbody className="divide-y divide-slate-50">
                     {filteredRecords.map(record => {
                       const scores = Object.values(record.scores) as number[];
@@ -1118,12 +1213,22 @@ export const Dashboard: React.FC<Props> = ({
                       const hasBothSignatures = !!record.lecturerSignature && !!record.evaluatorSignature;
                       return (
                         <tr key={record.id} className={`transition-all duration-300 ${
-                          recentlySavedId === record.id 
-                            ? (recentlySavedAction === 'updated' 
-                                ? 'bg-indigo-50/80 border-l-4 border-l-indigo-600 shadow-sm' 
-                                : 'bg-emerald-50/80 border-l-4 border-l-emerald-500 shadow-sm') 
-                            : 'hover:bg-slate-50'
+                          selectedRecordIds.has(record.id)
+                            ? 'bg-indigo-50/50'
+                            : (recentlySavedId === record.id 
+                                ? (recentlySavedAction === 'updated' 
+                                    ? 'bg-indigo-50/80 border-l-4 border-l-indigo-600 shadow-sm' 
+                                    : 'bg-emerald-50/80 border-l-4 border-l-emerald-500 shadow-sm') 
+                                : 'hover:bg-slate-50')
                         }`}>
+                          <td className="w-12 px-4 py-4 text-center">
+                            <input 
+                              type="checkbox"
+                              checked={selectedRecordIds.has(record.id)}
+                              onChange={() => toggleSelectRecord(record.id)}
+                              className="h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-bold text-slate-800">{record.lecturerName}</p>
@@ -1186,6 +1291,13 @@ export const Dashboard: React.FC<Props> = ({
                         </tr>
                       );
                     })}
+                    {filteredRecords.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-12 text-center text-slate-400 italic">
+                          Tiada rekod penilaian ditemui untuk carian ini.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
              </div>
@@ -1416,30 +1528,59 @@ export const Dashboard: React.FC<Props> = ({
                 )}
               </div>
             </div>
-            {selectedLecturerKeys.size > 0 && (
-              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-                  <span className="text-xs font-bold text-rose-800">
-                    {selectedLecturerKeys.size} pensyarah dipilih untuk dipadam
-                  </span>
+            {selectedLecturerKeys.size > 0 && (() => {
+              const selectedMonitored = monitoringStatus.filter(item => 
+                selectedLecturerKeys.has(`${item.name}|${item.department}`) && item.isMonitored && item.latestRecord
+              );
+              return (
+                <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                    <span className="text-xs font-bold text-rose-900">
+                      {selectedLecturerKeys.size} pensyarah dipilih {selectedMonitored.length > 0 ? `(${selectedMonitored.length} telah dipantau)` : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setSelectedLecturerKeys(new Set())}
+                      className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                    >
+                      Batal Pilihan
+                    </button>
+                    {selectedMonitored.length === 1 && (
+                      <button
+                        onClick={() => { onEditRecord(selectedMonitored[0].latestRecord!); setSelectedLecturerKeys(new Set()); }}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all active:scale-95"
+                        title="Kemaskini rekod pemantauan bagi pensyarah ini"
+                      >
+                        <PencilSquareIcon className="h-4 w-4" /> Kemaskini Rekod
+                      </button>
+                    )}
+                    {selectedMonitored.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const ids = selectedMonitored.map(i => i.latestRecord!.id);
+                          if (onDeleteMultipleRecords) onDeleteMultipleRecords(ids);
+                          else ids.forEach(id => onDeleteRecord(id));
+                          setSelectedLecturerKeys(new Set());
+                        }}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all active:scale-95"
+                        title="Padam rekod pemantauan pensyarah yang telah dipantau ini"
+                      >
+                        <TrashIcon className="h-4 w-4" /> Padam Rekod Dipantau ({selectedMonitored.length})
+                      </button>
+                    )}
+                    <button
+                      onClick={handleBatchDeleteLecturers}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl shadow-sm transition-all active:scale-95"
+                      title="Padam profil pensyarah yang dipilih daripada data"
+                    >
+                      <TrashIcon className="h-4 w-4 text-rose-500" /> Padam Profil ({selectedLecturerKeys.size})
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelectedLecturerKeys(new Set())}
-                    className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                  >
-                    Batal Pilihan
-                  </button>
-                  <button
-                    onClick={handleBatchDeleteLecturers}
-                    className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all active:scale-95"
-                  >
-                    <TrashIcon className="h-4 w-4" /> Padam Pensyarah Dipilih ({selectedLecturerKeys.size})
-                  </button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -1710,30 +1851,59 @@ export const Dashboard: React.FC<Props> = ({
               </div>
             </div>
 
-            {selectedLecturerKeys.size > 0 && (
-              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-                  <span className="text-xs font-bold text-rose-800">
-                    {selectedLecturerKeys.size} pensyarah dipilih untuk dipadam
-                  </span>
+            {selectedLecturerKeys.size > 0 && (() => {
+              const selectedMonitored = monitoringStatus.filter(item => 
+                selectedLecturerKeys.has(`${item.name}|${item.department}`) && item.isMonitored && item.latestRecord
+              );
+              return (
+                <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                    <span className="text-xs font-bold text-rose-900">
+                      {selectedLecturerKeys.size} pensyarah dipilih {selectedMonitored.length > 0 ? `(${selectedMonitored.length} telah dipantau)` : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setSelectedLecturerKeys(new Set())}
+                      className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                    >
+                      Batal Pilihan
+                    </button>
+                    {selectedMonitored.length === 1 && (
+                      <button
+                        onClick={() => { onEditRecord(selectedMonitored[0].latestRecord!); setSelectedLecturerKeys(new Set()); }}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all active:scale-95"
+                        title="Kemaskini rekod pemantauan bagi pensyarah ini"
+                      >
+                        <PencilSquareIcon className="h-4 w-4" /> Kemaskini Rekod
+                      </button>
+                    )}
+                    {selectedMonitored.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const ids = selectedMonitored.map(i => i.latestRecord!.id);
+                          if (onDeleteMultipleRecords) onDeleteMultipleRecords(ids);
+                          else ids.forEach(id => onDeleteRecord(id));
+                          setSelectedLecturerKeys(new Set());
+                        }}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all active:scale-95"
+                        title="Padam rekod pemantauan pensyarah yang telah dipantau ini"
+                      >
+                        <TrashIcon className="h-4 w-4" /> Padam Rekod Dipantau ({selectedMonitored.length})
+                      </button>
+                    )}
+                    <button
+                      onClick={handleBatchDeleteLecturers}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl shadow-sm transition-all active:scale-95"
+                      title="Padam profil pensyarah yang dipilih daripada data"
+                    >
+                      <TrashIcon className="h-4 w-4 text-rose-500" /> Padam Profil ({selectedLecturerKeys.size})
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelectedLecturerKeys(new Set())}
-                    className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                  >
-                    Batal Pilihan
-                  </button>
-                  <button
-                    onClick={handleBatchDeleteLecturers}
-                    className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all active:scale-95"
-                  >
-                    <TrashIcon className="h-4 w-4" /> Padam Pensyarah Dipilih ({selectedLecturerKeys.size})
-                  </button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -1885,16 +2055,70 @@ export const Dashboard: React.FC<Props> = ({
                   <input type="text" placeholder="Cari pensyarah..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500" />
                 </div>
              </div>
+             {selectedRecordIds.size > 0 && (
+               <div className="mb-4 p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                 <div className="flex items-center gap-2">
+                   <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
+                   <span className="text-xs font-bold text-indigo-900">
+                     {selectedRecordIds.size} rekod penilaian dipilih ({currentDept})
+                   </span>
+                 </div>
+                 <div className="flex items-center gap-2 flex-wrap">
+                   <button
+                     onClick={() => setSelectedRecordIds(new Set())}
+                     className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                   >
+                     Batal Pilihan
+                   </button>
+                   <button
+                     onClick={handleEditSelectedRecord}
+                     className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all active:scale-95"
+                     title={selectedRecordIds.size === 1 ? 'Kemaskini rekod penilaian ini' : 'Kemaskini rekod penilaian pertama yang dipilih'}
+                   >
+                     <PencilSquareIcon className="h-4 w-4" /> Kemaskini Rekod {selectedRecordIds.size > 1 ? '(Pertama)' : ''}
+                   </button>
+                   <button
+                     onClick={handleBatchDeleteRecords}
+                     className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all active:scale-95"
+                     title="Padam semua rekod penilaian yang dipilih secara kekal"
+                   >
+                     <TrashIcon className="h-4 w-4" /> Padam Rekod Dipilih ({selectedRecordIds.size})
+                   </button>
+                 </div>
+               </div>
+             )}
              <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead><tr className="bg-slate-50/50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px] tracking-widest"><th className="px-6 py-3">Maklumat Penilaian</th><th className="px-6 py-3 text-right">Tindakan</th></tr></thead>
+                  <thead>
+                    <tr className="bg-slate-50/50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px] tracking-widest">
+                      <th className="w-12 px-4 py-3 text-center">
+                        <input 
+                          type="checkbox"
+                          checked={filteredRecords.length > 0 && filteredRecords.every(r => selectedRecordIds.has(r.id))}
+                          onChange={() => toggleSelectAllRecords(filteredRecords)}
+                          className="h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                          title="Pilih Semua Rekod"
+                        />
+                      </th>
+                      <th className="px-6 py-3">Maklumat Penilaian</th>
+                      <th className="px-6 py-3 text-right">Tindakan</th>
+                    </tr>
+                  </thead>
                   <tbody className="divide-y divide-slate-50">
                     {filteredRecords.map(record => {
                       const scores = Object.values(record.scores) as number[];
                       const avg = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2) : '0.00';
                       const hasBothSignatures = !!record.lecturerSignature && !!record.evaluatorSignature;
                       return (
-                        <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                        <tr key={record.id} className={`hover:bg-slate-50 transition-colors ${selectedRecordIds.has(record.id) ? 'bg-indigo-50/50' : ''}`}>
+                          <td className="w-12 px-4 py-4 text-center">
+                            <input 
+                              type="checkbox"
+                              checked={selectedRecordIds.has(record.id)}
+                              onChange={() => toggleSelectRecord(record.id)}
+                              className="h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-bold text-slate-800">{record.lecturerName}</p>
@@ -1945,7 +2169,7 @@ export const Dashboard: React.FC<Props> = ({
                     })}
                     {filteredRecords.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="px-6 py-12 text-center text-slate-400 italic">
+                        <td colSpan={3} className="px-6 py-12 text-center text-slate-400 italic">
                           Belum ada rekod penilaian bagi {currentDept}.
                         </td>
                       </tr>

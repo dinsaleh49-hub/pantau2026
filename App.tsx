@@ -632,8 +632,9 @@ const App: React.FC = () => {
   
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    type: 'record' | 'lecturer' | 'multiple_lecturers' | 'schedule' | 'restore' | null;
+    type: 'record' | 'multiple_records' | 'lecturer' | 'multiple_lecturers' | 'schedule' | 'restore' | null;
     targetId: string | null;
+    targetRecordIds?: string[];
     targetLecturers?: { name: string; department: string }[];
     title: string;
     message: string;
@@ -642,6 +643,7 @@ const App: React.FC = () => {
     isOpen: false,
     type: null,
     targetId: null,
+    targetRecordIds: undefined,
     targetLecturers: undefined,
     title: '',
     message: '',
@@ -1019,6 +1021,22 @@ const App: React.FC = () => {
     });
   };
 
+  const openDeleteMultipleRecordsConfirm = (recordIds: string[]) => {
+    if (!recordIds || recordIds.length === 0) return;
+    const matchingRecords = records.filter(r => recordIds.includes(r.id));
+    const names = Array.from(new Set(matchingRecords.map(r => r.lecturerName)));
+    const namesPreview = names.slice(0, 3).join(', ') + (names.length > 3 ? ` dan ${names.length - 3} lagi` : '');
+    setConfirmModal({
+      isOpen: true,
+      type: 'multiple_records',
+      targetId: null,
+      targetRecordIds: recordIds,
+      title: `Padam ${recordIds.length} Rekod Penilaian Pensyarah?`,
+      message: `Adakah anda pasti mahu memadam ${recordIds.length} rekod penilaian yang dipilih (${namesPreview}) secara kekal? Tindakan ini boleh dilakukan jika berlaku sebarang kesilapan pengisian.`,
+      confirmText: `Ya, Padam (${recordIds.length}) Rekod`
+    });
+  };
+
   const openDeleteLecturerConfirm = (name: string, department: string) => {
     setConfirmModal({
       isOpen: true,
@@ -1147,6 +1165,51 @@ const App: React.FC = () => {
         localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
       } catch {}
       showNotification(`Rekod pemantauan bagi ${deletedRecord?.lecturerName || 'pensyarah'} berjaya dipadam.`, 'success');
+    } else if (confirmModal.type === 'multiple_records' && confirmModal.targetRecordIds) {
+      const idsToDelete = new Set(confirmModal.targetRecordIds);
+      const deletedRecordsList = records.filter(r => idsToDelete.has(r.id));
+
+      // Save to deletedIds list in localStorage so they are never re-seeded
+      try {
+        const existingDeleted = JSON.parse(localStorage.getItem('ipgkpt_deleted_records') || '[]');
+        confirmModal.targetRecordIds.forEach(id => {
+          if (!existingDeleted.includes(id)) existingDeleted.push(id);
+        });
+        localStorage.setItem('ipgkpt_deleted_records', JSON.stringify(existingDeleted));
+      } catch {}
+
+      // Inform server of deleted IDs
+      fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_records', ids: confirmModal.targetRecordIds })
+      }).catch(console.warn);
+
+      updatedRecords = records.filter((r: EvaluationRecord) => !idsToDelete.has(r.id));
+
+      // Revert schedule status to Pending if lecturers have no remaining records
+      const affectedLecturerNames = new Set(deletedRecordsList.map(r => r.lecturerName.trim().toLowerCase()));
+      affectedLecturerNames.forEach(lecName => {
+        const remaining = updatedRecords.filter(r => r.lecturerName.trim().toLowerCase() === lecName);
+        if (remaining.length === 0) {
+          updatedSchedules = updatedSchedules.map(s => {
+            if (s.lecturerName.trim().toLowerCase() === lecName) {
+              return { ...s, status: 'Pending' as const };
+            }
+            return s;
+          });
+        }
+      });
+
+      setRecords(updatedRecords);
+      setSchedules(updatedSchedules);
+      setIsLocalUpdate(prev => ({ ...prev, records: true, schedules: true }));
+      try {
+        localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
+        localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+      } catch {}
+
+      showNotification(`${confirmModal.targetRecordIds.length} rekod pemantauan pensyarah berjaya dipadam secara kekal.`, 'success');
     } else if (confirmModal.type === 'lecturer' && confirmModal.targetId) {
       const [name, dept] = confirmModal.targetId.split('|');
       
@@ -1372,6 +1435,7 @@ const App: React.FC = () => {
             userDept={user.department}
             isRestrictedUser={isRestrictedUser}
             onDeleteRecord={openDeleteRecordConfirm} 
+            onDeleteMultipleRecords={openDeleteMultipleRecordsConfirm}
             onDeleteLecturer={openDeleteLecturerConfirm}
             onDeleteMultipleLecturers={openDeleteMultipleLecturersConfirm}
             onDeleteSchedule={openDeleteScheduleConfirm}

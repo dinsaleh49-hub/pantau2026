@@ -343,10 +343,12 @@ const postRecords = async (req: any, res: any) => {
     return res.json({ success: true, count: currentRecords.length });
   }
 
-  // Case C: Delete single record
-  if (body && body.action === 'delete_record' && body.id) {
-    const targetId = body.id;
-    console.log(`[API] POST /api/records - Deleting record ID: ${targetId}`);
+  // Case C: Delete single or multiple records
+  if (body && ((body.action === 'delete_record' && body.id) || (body.action === 'delete_records' && Array.isArray(body.ids)))) {
+    const idsToDelete = new Set<string>(
+      body.action === 'delete_records' && Array.isArray(body.ids) ? body.ids : [body.id]
+    );
+    console.log(`[API] POST /api/records - Deleting ${idsToDelete.size} records...`);
     let currentRecords: any[] = [];
     if (supabase) {
       try {
@@ -362,7 +364,7 @@ const postRecords = async (req: any, res: any) => {
       } catch {}
     }
 
-    const filtered = currentRecords.filter((r: any) => r.id !== targetId);
+    const filtered = currentRecords.filter((r: any) => !idsToDelete.has(r.id));
 
     if (supabase) {
       try {
