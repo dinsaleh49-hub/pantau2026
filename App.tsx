@@ -128,15 +128,37 @@ const App: React.FC = () => {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lecturersList, setLecturersList] = useState<Lecturer[]>(() => {
     try {
+      let deletedLecturerKeys = new Set<string>();
+      try {
+        const delSaved = localStorage.getItem('ipgkpt_deleted_lecturers');
+        if (delSaved) {
+          const parsed = JSON.parse(delSaved);
+          if (Array.isArray(parsed)) {
+            deletedLecturerKeys = new Set(parsed.map((k: string) => k.toLowerCase().trim()));
+          }
+        }
+      } catch {}
+
+      const isDeleted = (name: string, dept?: string) => {
+        const n = (name || '').trim().toLowerCase();
+        if (deletedLecturerKeys.has(n)) return true;
+        if (dept && deletedLecturerKeys.has(`${n}|${dept.trim().toLowerCase()}`)) return true;
+        return false;
+      };
+
       const saved = localStorage.getItem('ipgkpt_lecturers');
       const savedList: Lecturer[] = saved ? JSON.parse(saved) : [];
       const map = new Map<string, Lecturer>();
       savedList.forEach(l => {
-        if (l && l.name) map.set(l.name.trim().toLowerCase(), l);
+        if (l && l.name && !isDeleted(l.name, l.department)) {
+          map.set(l.name.trim().toLowerCase(), l);
+        }
       });
       // Canonical LECTURERS authoritative definition
       LECTURERS.forEach(l => {
-        if (l && l.name) map.set(l.name.trim().toLowerCase(), l);
+        if (l && l.name && !isDeleted(l.name, l.department)) {
+          map.set(l.name.trim().toLowerCase(), l);
+        }
       });
       return Array.from(map.values());
     } catch {
@@ -415,24 +437,50 @@ const App: React.FC = () => {
           const lecturersData = await lecturersSettled.value.json();
           const serverList: Lecturer[] = Array.isArray(lecturersData) ? lecturersData : [];
 
+          let deletedLecturerKeys = new Set<string>();
+          try {
+            const delSaved = localStorage.getItem('ipgkpt_deleted_lecturers');
+            if (delSaved) {
+              const parsed = JSON.parse(delSaved);
+              if (Array.isArray(parsed)) {
+                deletedLecturerKeys = new Set(parsed.map((k: string) => k.toLowerCase().trim()));
+              }
+            }
+          } catch {}
+
+          const isDeleted = (name: string, dept?: string) => {
+            const n = (name || '').trim().toLowerCase();
+            if (deletedLecturerKeys.has(n)) return true;
+            if (dept && deletedLecturerKeys.has(`${n}|${dept.trim().toLowerCase()}`)) return true;
+            return false;
+          };
+
           let localLecturers: Lecturer[] = [];
           try {
             const saved = localStorage.getItem('ipgkpt_lecturers');
             if (saved) {
               const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed)) localLecturers = parsed;
+              if (Array.isArray(parsed)) {
+                localLecturers = parsed.filter(l => l && l.name && !isDeleted(l.name, l.department));
+              }
             }
           } catch {}
 
           const lecMap = new Map<string, Lecturer>();
           serverList.forEach(l => {
-            if (l && l.name) lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+            if (l && l.name && !isDeleted(l.name, l.department)) {
+              lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+            }
           });
           localLecturers.forEach(l => {
-            if (l && l.name) lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+            if (l && l.name && !isDeleted(l.name, l.department)) {
+              lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+            }
           });
           LECTURERS.forEach(l => {
-            if (l && l.name) lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+            if (l && l.name && !isDeleted(l.name, l.department)) {
+              lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+            }
           });
 
           const mergedLecturers = Array.from(lecMap.values());
@@ -584,8 +632,9 @@ const App: React.FC = () => {
   
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    type: 'record' | 'lecturer' | 'schedule' | 'restore' | null;
+    type: 'record' | 'lecturer' | 'multiple_lecturers' | 'schedule' | 'restore' | null;
     targetId: string | null;
+    targetLecturers?: { name: string; department: string }[];
     title: string;
     message: string;
     confirmText?: string;
@@ -593,6 +642,7 @@ const App: React.FC = () => {
     isOpen: false,
     type: null,
     targetId: null,
+    targetLecturers: undefined,
     title: '',
     message: '',
     confirmText: ''
@@ -975,8 +1025,22 @@ const App: React.FC = () => {
       type: 'lecturer',
       targetId: `${name}|${department}`,
       title: 'Padam Maklumat Pensyarah?',
-      message: `Adakah anda pasti mahu memadam pensyarah "${name}" (${department}) dari senarai induk jika berlaku sebarang kesilapan pendaftaran?`,
+      message: `Adakah anda pasti mahu memadam pensyarah "${name}" (${department}) dari senarai data secara kekal jika berlaku sebarang kesilapan?`,
       confirmText: 'Ya, Padam Pensyarah'
+    });
+  };
+
+  const openDeleteMultipleLecturersConfirm = (targets: { name: string; department: string }[]) => {
+    if (!targets || targets.length === 0) return;
+    const namesPreview = targets.slice(0, 3).map(t => t.name).join(', ') + (targets.length > 3 ? ` dan ${targets.length - 3} lagi` : '');
+    setConfirmModal({
+      isOpen: true,
+      type: 'multiple_lecturers',
+      targetId: null,
+      targetLecturers: targets,
+      title: `Padam ${targets.length} Orang Pensyarah?`,
+      message: `Adakah anda pasti mahu memadam ${targets.length} orang pensyarah yang dipilih (${namesPreview}) secara kekal daripada data? Tindakan ini akan mengeluarkan mereka daripada senarai pensyarah kampus/jabatan.`,
+      confirmText: `Ya, Padam (${targets.length}) Pensyarah`
     });
   };
 
@@ -1085,10 +1149,64 @@ const App: React.FC = () => {
       showNotification(`Rekod pemantauan bagi ${deletedRecord?.lecturerName || 'pensyarah'} berjaya dipadam.`, 'success');
     } else if (confirmModal.type === 'lecturer' && confirmModal.targetId) {
       const [name, dept] = confirmModal.targetId.split('|');
+      
+      // Save to ipgkpt_deleted_lecturers so it is never re-seeded
+      try {
+        const existingDeleted: string[] = JSON.parse(localStorage.getItem('ipgkpt_deleted_lecturers') || '[]');
+        const key = `${name.trim().toLowerCase()}|${dept.trim().toLowerCase()}`;
+        if (!existingDeleted.includes(key)) existingDeleted.push(key);
+        if (!existingDeleted.includes(name.trim().toLowerCase())) existingDeleted.push(name.trim().toLowerCase());
+        localStorage.setItem('ipgkpt_deleted_lecturers', JSON.stringify(existingDeleted));
+      } catch {}
+
+      // Inform server of deleted lecturer
+      fetch('/api/lecturers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_lecturers', lecturers: [{ name, department: dept }] })
+      }).catch(console.warn);
+
       updatedLecturers = lecturersList.filter((l: Lecturer) => !(l.name === name && l.department === dept));
       setLecturersList(updatedLecturers);
       setIsLocalUpdate(prev => ({ ...prev, lecturers: true }));
-      showNotification('Maklumat pensyarah berjaya dipadam.', 'success');
+      try {
+        localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+      } catch {}
+      showNotification(`Maklumat pensyarah "${name}" berjaya dipadam daripada data.`, 'success');
+    } else if (confirmModal.type === 'multiple_lecturers' && confirmModal.targetLecturers) {
+      const targets = confirmModal.targetLecturers;
+      const targetKeys = new Set(targets.map(t => `${t.name.trim().toLowerCase()}|${t.department.trim().toLowerCase()}`));
+      const targetNames = new Set(targets.map(t => t.name.trim().toLowerCase()));
+
+      // Save to ipgkpt_deleted_lecturers in localStorage
+      try {
+        const existingDeleted: string[] = JSON.parse(localStorage.getItem('ipgkpt_deleted_lecturers') || '[]');
+        targets.forEach(t => {
+          const k = `${t.name.trim().toLowerCase()}|${t.department.trim().toLowerCase()}`;
+          if (!existingDeleted.includes(k)) existingDeleted.push(k);
+          const kNameOnly = t.name.trim().toLowerCase();
+          if (!existingDeleted.includes(kNameOnly)) existingDeleted.push(kNameOnly);
+        });
+        localStorage.setItem('ipgkpt_deleted_lecturers', JSON.stringify(existingDeleted));
+      } catch {}
+
+      // Inform server
+      fetch('/api/lecturers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_lecturers', lecturers: targets })
+      }).catch(console.warn);
+
+      updatedLecturers = lecturersList.filter((l: Lecturer) => 
+        !targetKeys.has(`${l.name.trim().toLowerCase()}|${l.department.trim().toLowerCase()}`) &&
+        !targetNames.has(l.name.trim().toLowerCase())
+      );
+      setLecturersList(updatedLecturers);
+      setIsLocalUpdate(prev => ({ ...prev, lecturers: true }));
+      try {
+        localStorage.setItem('ipgkpt_lecturers', JSON.stringify(updatedLecturers));
+      } catch {}
+      showNotification(`${targets.length} orang pensyarah berjaya dipadam daripada data.`, 'success');
     } else if (confirmModal.type === 'schedule' && confirmModal.targetId) {
       updatedSchedules = schedules.filter((s: MonitoringSchedule) => s.id !== confirmModal.targetId);
       setSchedules(updatedSchedules);
@@ -1255,6 +1373,7 @@ const App: React.FC = () => {
             isRestrictedUser={isRestrictedUser}
             onDeleteRecord={openDeleteRecordConfirm} 
             onDeleteLecturer={openDeleteLecturerConfirm}
+            onDeleteMultipleLecturers={openDeleteMultipleLecturersConfirm}
             onDeleteSchedule={openDeleteScheduleConfirm}
             onEditRecord={handleEditRecord}
             onStartEvaluation={handleStartEvaluation}

@@ -67,6 +67,7 @@ interface Props {
   username?: string;
   onDeleteRecord: (id: string) => void;
   onDeleteLecturer: (name: string, department: string) => void;
+  onDeleteMultipleLecturers?: (lecturers: { name: string; department: string }[]) => void;
   onDeleteSchedule: (id: string) => void;
   onEditRecord: (record: EvaluationRecord) => void;
   onAddSchedule: (schedule: MonitoringSchedule) => void;
@@ -104,6 +105,7 @@ export const Dashboard: React.FC<Props> = ({
   recentlySavedAction,
   onDeleteRecord,
   onDeleteLecturer,
+  onDeleteMultipleLecturers,
   onDeleteSchedule,
   onEditRecord,
   onAddSchedule,
@@ -171,6 +173,46 @@ export const Dashboard: React.FC<Props> = ({
     code: '',
     location: ''
   });
+
+  // Checkbox selection state for lecturers (key: "name|department")
+  const [selectedLecturerKeys, setSelectedLecturerKeys] = useState<Set<string>>(new Set());
+
+  const toggleSelectLecturer = (key: string) => {
+    setSelectedLecturerKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = (items: { name: string; department: string }[]) => {
+    const visibleKeys = items.map(item => `${item.name}|${item.department}`);
+    const allVisibleSelected = visibleKeys.length > 0 && visibleKeys.every(k => selectedLecturerKeys.has(k));
+    setSelectedLecturerKeys(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleKeys.forEach(k => next.delete(k));
+      } else {
+        visibleKeys.forEach(k => next.add(k));
+      }
+      return next;
+    });
+  };
+
+  const handleBatchDeleteLecturers = () => {
+    if (selectedLecturerKeys.size === 0) return;
+    const targets = Array.from(selectedLecturerKeys).map(k => {
+      const [name, department] = k.split('|');
+      return { name, department: department || '' };
+    });
+    if (onDeleteMultipleLecturers) {
+      onDeleteMultipleLecturers(targets);
+    } else {
+      targets.forEach(t => onDeleteLecturer(t.name, t.department));
+    }
+    setSelectedLecturerKeys(new Set());
+  };
 
   // Lecturers, Records, and Schedules strictly scoped when viewing a department
   const currentDeptLecturers = useMemo(() => {
@@ -1374,13 +1416,60 @@ export const Dashboard: React.FC<Props> = ({
                 )}
               </div>
             </div>
+            {selectedLecturerKeys.size > 0 && (
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-xs font-bold text-rose-800">
+                    {selectedLecturerKeys.size} pensyarah dipilih untuk dipadam
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedLecturerKeys(new Set())}
+                    className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                  >
+                    Batal Pilihan
+                  </button>
+                  <button
+                    onClick={handleBatchDeleteLecturers}
+                    className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all active:scale-95"
+                  >
+                    <TrashIcon className="h-4 w-4" /> Padam Pensyarah Dipilih ({selectedLecturerKeys.size})
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead><tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px]"><th className="px-8 py-4">Nama</th><th className="px-8 py-4">Status</th><th className="px-8 py-4 text-right">Tindakan</th></tr></thead>
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px]">
+                    <th className="w-12 px-4 py-4 text-center">
+                      <input 
+                        type="checkbox"
+                        checked={monitoringStatus.length > 0 && monitoringStatus.every(item => selectedLecturerKeys.has(`${item.name}|${item.department}`))}
+                        onChange={() => toggleSelectAllVisible(monitoringStatus)}
+                        className="h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                        title="Pilih Semua Pensyarah"
+                      />
+                    </th>
+                    <th className="px-6 py-4">Nama</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Tindakan</th>
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-slate-50">
                   {monitoringStatus.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-8 py-4">
+                    <tr key={idx} className={`hover:bg-slate-50 transition-colors ${selectedLecturerKeys.has(`${item.name}|${item.department}`) ? 'bg-indigo-50/50' : ''}`}>
+                      <td className="w-12 px-4 py-4 text-center">
+                        <input 
+                          type="checkbox"
+                          checked={selectedLecturerKeys.has(`${item.name}|${item.department}`)}
+                          onChange={() => toggleSelectLecturer(`${item.name}|${item.department}`)}
+                          className="h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-slate-800">{item.name}</p>
                           {item.isKJ && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
@@ -1621,10 +1710,44 @@ export const Dashboard: React.FC<Props> = ({
               </div>
             </div>
 
+            {selectedLecturerKeys.size > 0 && (
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-xs font-bold text-rose-800">
+                    {selectedLecturerKeys.size} pensyarah dipilih untuk dipadam
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedLecturerKeys(new Set())}
+                    className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                  >
+                    Batal Pilihan
+                  </button>
+                  <button
+                    onClick={handleBatchDeleteLecturers}
+                    className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all active:scale-95"
+                  >
+                    <TrashIcon className="h-4 w-4" /> Padam Pensyarah Dipilih ({selectedLecturerKeys.size})
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 uppercase text-[10px]">
+                    <th className="w-12 px-4 py-4 text-center">
+                      <input 
+                        type="checkbox"
+                        checked={monitoringStatus.length > 0 && monitoringStatus.every(item => selectedLecturerKeys.has(`${item.name}|${item.department}`))}
+                        onChange={() => toggleSelectAllVisible(monitoringStatus)}
+                        className="h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                        title="Pilih Semua Pensyarah"
+                      />
+                    </th>
                     <th className="px-6 py-4">Nama Pensyarah ({currentDept})</th>
                     <th className="px-6 py-4">Status Penilaian</th>
                     <th className="px-6 py-4 text-right">Tindakan</th>
@@ -1632,7 +1755,15 @@ export const Dashboard: React.FC<Props> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {monitoringStatus.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
+                    <tr key={idx} className={`hover:bg-slate-50 transition-colors ${selectedLecturerKeys.has(`${item.name}|${item.department}`) ? 'bg-indigo-50/50' : ''}`}>
+                      <td className="w-12 px-4 py-4 text-center">
+                        <input 
+                          type="checkbox"
+                          checked={selectedLecturerKeys.has(`${item.name}|${item.department}`)}
+                          onChange={() => toggleSelectLecturer(`${item.name}|${item.department}`)}
+                          className="h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-slate-800">{item.name}</p>
@@ -1732,7 +1863,7 @@ export const Dashboard: React.FC<Props> = ({
                   ))}
                   {monitoringStatus.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-12 text-center text-slate-400 italic">
+                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
                         Tiada pensyarah ditemui untuk carian ini dalam {currentDept}.
                       </td>
                     </tr>

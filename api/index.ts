@@ -622,6 +622,46 @@ const postLecturers = async (req: any, res: any) => {
     return res.json({ success: true, count: currentLecturers.length });
   }
 
+  // Delete one or multiple lecturers
+  if (body && body.action === 'delete_lecturers' && Array.isArray(body.lecturers)) {
+    const toDeleteList: any[] = body.lecturers;
+    const deleteKeys = new Set(toDeleteList.map((t: any) => `${(t.name || '').trim().toLowerCase()}|${(t.department || '').trim().toLowerCase()}`));
+    const deleteNames = new Set(toDeleteList.map((t: any) => (t.name || '').trim().toLowerCase()));
+
+    console.log(`[API] POST /api/lecturers - Deleting ${toDeleteList.length} lecturers...`);
+    let currentLecturers: any[] = [];
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('epantau_storage').select('content').eq('id', 'lecturers').maybeSingle();
+        if (Array.isArray(data?.content)) currentLecturers = [...data.content];
+      } catch (err) {}
+    }
+    if (currentLecturers.length === 0 && fs.existsSync(LECTURERS_FILE)) {
+      try { currentLecturers = JSON.parse(fs.readFileSync(LECTURERS_FILE, 'utf-8')); } catch {}
+    }
+    if (currentLecturers.length === 0 && fs.existsSync(INITIAL_LECTURERS_FILE)) {
+      try { currentLecturers = JSON.parse(fs.readFileSync(INITIAL_LECTURERS_FILE, 'utf-8')); } catch {}
+    }
+
+    currentLecturers = currentLecturers.filter((l: any) => {
+      const key = `${(l.name || '').trim().toLowerCase()}|${(l.department || '').trim().toLowerCase()}`;
+      const name = (l.name || '').trim().toLowerCase();
+      return !deleteKeys.has(key) && !deleteNames.has(name);
+    });
+
+    if (supabase) {
+      try {
+        await supabase.from('epantau_storage').upsert({ id: 'lecturers', content: currentLecturers, updated_at: new Date() });
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+    if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+      try { fs.writeFileSync(LECTURERS_FILE, JSON.stringify(currentLecturers, null, 2)); } catch {}
+    }
+    return res.json({ success: true, count: currentLecturers.length });
+  }
+
   const lecturers = body;
   const count = Array.isArray(lecturers) ? lecturers.length : 0;
   console.log(`[API] POST /api/lecturers - Saving ${count} lecturers...`);
