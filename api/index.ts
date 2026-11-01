@@ -168,7 +168,7 @@ const getRecords = async (req: any, res: any) => {
       if (fs.existsSync(RECORDS_FILE)) {
         const content = fs.readFileSync(RECORDS_FILE, "utf-8");
         const parsed = JSON.parse(content);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return res.json(parsed);
         }
       }
@@ -466,7 +466,7 @@ const getSchedules = async (req: any, res: any) => {
       if (fs.existsSync(SCHEDULES_FILE)) {
         const content = fs.readFileSync(SCHEDULES_FILE, "utf-8");
         const parsed = JSON.parse(content);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return res.json(parsed);
         }
       }
@@ -518,6 +518,34 @@ const postSchedules = async (req: any, res: any) => {
       try { fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(currentSchedules, null, 2)); } catch {}
     }
     return res.json({ success: true, count: currentSchedules.length });
+  }
+
+  // Delete single or multiple schedules
+  if (body && ((body.action === 'delete_schedule' && body.id) || (body.action === 'delete_schedules' && Array.isArray(body.ids)))) {
+    const idsToDelete = new Set<string>(
+      body.action === 'delete_schedules' && Array.isArray(body.ids) ? body.ids : [body.id]
+    );
+    console.log(`[API] POST /api/schedules - Deleting ${idsToDelete.size} schedules...`);
+    let currentSchedules: any[] = [];
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('epantau_storage').select('content').eq('id', 'schedules').maybeSingle();
+        if (Array.isArray(data?.content)) currentSchedules = [...data.content];
+      } catch (err) {}
+    }
+    if (currentSchedules.length === 0 && fs.existsSync(SCHEDULES_FILE)) {
+      try { currentSchedules = JSON.parse(fs.readFileSync(SCHEDULES_FILE, 'utf-8')); } catch {}
+    }
+    const filtered = currentSchedules.filter((s: any) => !idsToDelete.has(s.id));
+    if (supabase) {
+      try {
+        await supabase.from('epantau_storage').upsert({ id: 'schedules', content: filtered, updated_at: new Date() });
+      } catch (err: any) {}
+    }
+    if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+      try { fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(filtered, null, 2)); } catch {}
+    }
+    return res.json({ success: true, count: filtered.length });
   }
 
   const schedules = body;
@@ -625,8 +653,10 @@ const postLecturers = async (req: any, res: any) => {
   }
 
   // Delete one or multiple lecturers
-  if (body && body.action === 'delete_lecturers' && Array.isArray(body.lecturers)) {
-    const toDeleteList: any[] = body.lecturers;
+  if (body && ((body.action === 'delete_lecturers' && Array.isArray(body.lecturers)) || (body.action === 'delete_lecturer' && body.name))) {
+    const toDeleteList: any[] = body.action === 'delete_lecturer' 
+      ? [{ name: body.name, department: body.department }] 
+      : body.lecturers;
     const deleteKeys = new Set(toDeleteList.map((t: any) => `${(t.name || '').trim().toLowerCase()}|${(t.department || '').trim().toLowerCase()}`));
     const deleteNames = new Set(toDeleteList.map((t: any) => (t.name || '').trim().toLowerCase()));
 

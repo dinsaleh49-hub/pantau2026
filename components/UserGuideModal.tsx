@@ -59,9 +59,13 @@ export const UserGuideModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 <p className="text-xs font-bold text-slate-800 mb-1">Ketua Jabatan (KJ)</p>
                 <p className="text-[11px] text-slate-500">Akses kepada data jabatan masing-masing dan status pemantauan staf.</p>
               </div>
+              <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100">
+                <p className="text-xs font-bold text-purple-900 mb-1">Timbalan Pengarah (TP)</p>
+                <p className="text-[11px] text-purple-700">Akses portal khas pemantauan Ketua Jabatan (login: <strong>tp</strong>, password: <strong>tp</strong>).</p>
+              </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <p className="text-xs font-bold text-slate-800 mb-1">Pensyarah</p>
-                <p className="text-[11px] text-slate-500">Akses terhad untuk pendaftaran jadual dan melihat status pemantauan kendiri.</p>
+                <p className="text-[11px] text-slate-500">Akses pendaftaran jadual dan status pemantauan kendiri (login: <strong>pensyarah</strong>).</p>
               </div>
             </div>
           </section>

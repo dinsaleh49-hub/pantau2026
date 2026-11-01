@@ -89,12 +89,8 @@ const App: React.FC = () => {
       const saved = localStorage.getItem('ipgkpt_records');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
-          const recMap = new Map<string, EvaluationRecord>();
-          INITIAL_RECORDS.filter(r => !deletedIds.has(r.id)).forEach(r => recMap.set(r.id, r));
-          cleaned.forEach(r => recMap.set(r.id, r));
-          return Array.from(recMap.values());
+        if (Array.isArray(parsed)) {
+          return parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
         }
       }
       return INITIAL_RECORDS.filter(r => !deletedIds.has(r.id));
@@ -106,11 +102,8 @@ const App: React.FC = () => {
       const saved = localStorage.getItem('ipgkpt_schedules');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const schedMap = new Map<string, MonitoringSchedule>();
-          INITIAL_SCHEDULES.forEach(s => schedMap.set(s.id, s));
-          parsed.forEach(s => schedMap.set(s.id, s));
-          return Array.from(schedMap.values());
+        if (Array.isArray(parsed)) {
+          return parsed;
         }
       }
     } catch {}
@@ -128,42 +121,15 @@ const App: React.FC = () => {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lecturersList, setLecturersList] = useState<Lecturer[]>(() => {
     try {
-      let deletedLecturerKeys = new Set<string>();
-      try {
-        const delSaved = localStorage.getItem('ipgkpt_deleted_lecturers');
-        if (delSaved) {
-          const parsed = JSON.parse(delSaved);
-          if (Array.isArray(parsed)) {
-            deletedLecturerKeys = new Set(parsed.map((k: string) => k.toLowerCase().trim()));
-          }
-        }
-      } catch {}
-
-      const isDeleted = (name: string, dept?: string) => {
-        const n = (name || '').trim().toLowerCase();
-        if (deletedLecturerKeys.has(n)) return true;
-        if (dept && deletedLecturerKeys.has(`${n}|${dept.trim().toLowerCase()}`)) return true;
-        return false;
-      };
-
       const saved = localStorage.getItem('ipgkpt_lecturers');
-      const savedList: Lecturer[] = saved ? JSON.parse(saved) : [];
-      const map = new Map<string, Lecturer>();
-      savedList.forEach(l => {
-        if (l && l.name && !isDeleted(l.name, l.department)) {
-          map.set(l.name.trim().toLowerCase(), l);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
         }
-      });
-      // Canonical LECTURERS authoritative definition
-      LECTURERS.forEach(l => {
-        if (l && l.name && !isDeleted(l.name, l.department)) {
-          map.set(l.name.trim().toLowerCase(), l);
-        }
-      });
-      return Array.from(map.values());
-    } catch {
-      return LECTURERS;
-    }
+      }
+    } catch {}
+    return LECTURERS;
   });
   // Ruangan tandatangan dikosongkan dan tandatangan terdahulu dipadamkan
   const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>({});
@@ -230,10 +196,32 @@ const App: React.FC = () => {
     }
   };
 
+  const syncChannelRef = useRef<BroadcastChannel | null>(null);
+
+  const notifyDataChanged = useCallback(() => {
+    try {
+      syncChannelRef.current?.postMessage({ type: 'DATA_CHANGED', time: Date.now() });
+    } catch {}
+  }, []);
+
+
   // Safely sync records in batches to never exceed serverless 4.5MB payload limit (Vercel 413 prevention)
   const syncRecordsToServerSafely = useCallback(async (recordsToSync: EvaluationRecord[]) => {
-    if (!Array.isArray(recordsToSync) || recordsToSync.length === 0) {
-      return { success: true, count: 0 };
+    if (!Array.isArray(recordsToSync)) {
+      return { success: false, count: 0 };
+    }
+
+    if (recordsToSync.length === 0) {
+      const res = await fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([])
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Server error on /api/records: ${res.status} ${errText}`);
+      }
+      return res.json();
     }
 
     const payloadStr = JSON.stringify(recordsToSync);
@@ -328,50 +316,15 @@ const App: React.FC = () => {
               deletedIds = new Set<string>(JSON.parse(localStorage.getItem('ipgkpt_deleted_records') || '[]'));
             } catch {}
 
+            // Server is single source of truth across all devices
             const cleanedServer = recordsData.filter((r: any) => 
               r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09'
             );
             
-            // Read local records
-            let localRecords: EvaluationRecord[] = [];
+            setRecords(cleanedServer);
             try {
-              const saved = localStorage.getItem('ipgkpt_records');
-              if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) {
-                  localRecords = parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
-                }
-              }
+              localStorage.setItem('ipgkpt_records', JSON.stringify(cleanedServer));
             } catch {}
-
-            const recMap = new Map<string, EvaluationRecord>();
-            INITIAL_RECORDS.filter(r => !deletedIds.has(r.id)).forEach(r => recMap.set(r.id, r));
-            cleanedServer.forEach(r => { if (r && r.id && !deletedIds.has(r.id)) recMap.set(r.id, r); });
-
-            let hasNewerLocal = false;
-            localRecords.forEach(loc => {
-              if (!loc || !loc.id || deletedIds.has(loc.id)) return;
-              const existing = recMap.get(loc.id);
-              if (!existing) {
-                recMap.set(loc.id, loc);
-                hasNewerLocal = true;
-              } else {
-                const locTime = loc.timestamp || 0;
-                const existTime = existing.timestamp || 0;
-                if (locTime > existTime) {
-                  recMap.set(loc.id, loc);
-                  hasNewerLocal = true;
-                }
-              }
-            });
-
-            const mergedRecords = Array.from(recMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            setRecords(mergedRecords);
-            localStorage.setItem('ipgkpt_records', JSON.stringify(mergedRecords));
-
-            if (hasNewerLocal || cleanedServer.length < mergedRecords.length) {
-              syncRecordsToServerSafely(mergedRecords).catch(console.error);
-            }
           }
         } catch (e) {
           console.warn("Failed to parse records data:", e);
@@ -383,48 +336,10 @@ const App: React.FC = () => {
         try {
           const schedulesData = await schedulesSettled.value.json();
           if (Array.isArray(schedulesData)) {
-            let localSchedules: MonitoringSchedule[] = [];
+            setSchedules(schedulesData);
             try {
-              const saved = localStorage.getItem('ipgkpt_schedules');
-              if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) localSchedules = parsed;
-              }
+              localStorage.setItem('ipgkpt_schedules', JSON.stringify(schedulesData));
             } catch {}
-
-            const schedMap = new Map<string, MonitoringSchedule>();
-            INITIAL_SCHEDULES.forEach(s => schedMap.set(s.id, s));
-            schedulesData.forEach(s => { if (s && s.id) schedMap.set(s.id, s); });
-
-            let hasNewerLocal = false;
-            localSchedules.forEach(loc => {
-              if (!loc || !loc.id) return;
-              const existing = schedMap.get(loc.id);
-              if (!existing) {
-                schedMap.set(loc.id, loc);
-                hasNewerLocal = true;
-              } else {
-                if (loc.status === 'Completed' && existing.status !== 'Completed') {
-                  schedMap.set(loc.id, loc);
-                  hasNewerLocal = true;
-                } else if ((loc.timestamp || 0) > (existing.timestamp || 0)) {
-                  schedMap.set(loc.id, loc);
-                  hasNewerLocal = true;
-                }
-              }
-            });
-
-            const mergedSchedules = Array.from(schedMap.values());
-            setSchedules(mergedSchedules);
-            localStorage.setItem('ipgkpt_schedules', JSON.stringify(mergedSchedules));
-
-            if (hasNewerLocal || schedulesData.length < mergedSchedules.length) {
-              fetch('/api/schedules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(mergedSchedules)
-              }).catch(console.error);
-            }
           }
         } catch (e) {
           console.warn("Failed to parse schedules data:", e);
@@ -435,69 +350,11 @@ const App: React.FC = () => {
         anySuccess = true;
         try {
           const lecturersData = await lecturersSettled.value.json();
-          const serverList: Lecturer[] = Array.isArray(lecturersData) ? lecturersData : [];
-
-          let deletedLecturerKeys = new Set<string>();
-          try {
-            const delSaved = localStorage.getItem('ipgkpt_deleted_lecturers');
-            if (delSaved) {
-              const parsed = JSON.parse(delSaved);
-              if (Array.isArray(parsed)) {
-                deletedLecturerKeys = new Set(parsed.map((k: string) => k.toLowerCase().trim()));
-              }
-            }
-          } catch {}
-
-          const isDeleted = (name: string, dept?: string) => {
-            const n = (name || '').trim().toLowerCase();
-            if (deletedLecturerKeys.has(n)) return true;
-            if (dept && deletedLecturerKeys.has(`${n}|${dept.trim().toLowerCase()}`)) return true;
-            return false;
-          };
-
-          let localLecturers: Lecturer[] = [];
-          try {
-            const saved = localStorage.getItem('ipgkpt_lecturers');
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed)) {
-                localLecturers = parsed.filter(l => l && l.name && !isDeleted(l.name, l.department));
-              }
-            }
-          } catch {}
-
-          const lecMap = new Map<string, Lecturer>();
-          serverList.forEach(l => {
-            if (l && l.name && !isDeleted(l.name, l.department)) {
-              lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
-            }
-          });
-          localLecturers.forEach(l => {
-            if (l && l.name && !isDeleted(l.name, l.department)) {
-              lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
-            }
-          });
-          LECTURERS.forEach(l => {
-            if (l && l.name && !isDeleted(l.name, l.department)) {
-              lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
-            }
-          });
-
-          const mergedLecturers = Array.from(lecMap.values());
-          setLecturersList(mergedLecturers);
-          localStorage.setItem('ipgkpt_lecturers', JSON.stringify(mergedLecturers));
-
-          const needsServerSync = serverList.length !== mergedLecturers.length || serverList.some(s => {
-            const m = lecMap.get(s.name.trim().toLowerCase());
-            return m && m.department !== s.department;
-          });
-
-          if (needsServerSync) {
-            fetch('/api/lecturers', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(mergedLecturers)
-            }).catch(console.error);
+          if (Array.isArray(lecturersData) && lecturersData.length > 0) {
+            setLecturersList(lecturersData);
+            try {
+              localStorage.setItem('ipgkpt_lecturers', JSON.stringify(lecturersData));
+            } catch {}
           }
         } catch (e) {
           console.warn("Failed to parse lecturers data:", e);
@@ -525,7 +382,6 @@ const App: React.FC = () => {
       }
 
       if (anySuccess) {
-        // Successfully connected to backend and synced
         setSyncError(null);
       } else {
         const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
@@ -554,8 +410,22 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchData();
 
-    // Polling every 20 seconds for faster sync across devices
-    const interval = setInterval(() => fetchData(true), 20000);
+    // Fast polling every 5 seconds when tab is active for near instant sync across devices
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchData(true);
+      }
+    }, 5000);
+
+    const handleFocus = () => {
+      fetchData(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchData(true);
+      }
+    };
 
     const handleOnline = () => {
       console.log("[App] Network back online, syncing...");
@@ -568,14 +438,34 @@ const App: React.FC = () => {
       setSyncError("Di luar talian (data selamat disimpan secara setempat)");
     };
 
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
       clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, [fetchData]);
+
+  // Real-time synchronization across browser tabs
+  useEffect(() => {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('ipgkpt_epantau_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'DATA_CHANGED') {
+          fetchData(true);
+        }
+      };
+      syncChannelRef.current = channel;
+      return () => {
+        channel.close();
+      };
+    }
   }, [fetchData]);
 
   const handleLogin = (userData: { username: string; department: string; role: 'admin' | 'user' }, remember: boolean) => {
@@ -835,6 +725,7 @@ const App: React.FC = () => {
 
     // Full sync in background
     syncData(updatedRecords, updatedSchedules, updatedLecturers).catch(console.error);
+    notifyDataChanged();
     
     const scoreVals = Object.values(normalizedRecord.scores || {}) as number[];
     const avgScore = scoreVals.length > 0 ? (scoreVals.reduce((a, b) => a + b, 0) / scoreVals.length).toFixed(2) : '-';
@@ -859,6 +750,7 @@ const App: React.FC = () => {
     course?: string;
     code?: string;
     date?: string;
+    evaluatorName?: string;
   }) => {
     const targetDept = preset?.department || (user?.role === 'admin' ? '' : user?.department || '');
     const targetLecturer = preset?.lecturerName || '';
@@ -872,7 +764,7 @@ const App: React.FC = () => {
       code: preset?.code || '',
       credit: '',
       date: preset?.date || new Date().toISOString().split('T')[0],
-      evaluatorName: user?.username || '',
+      evaluatorName: preset?.evaluatorName || (user?.username || ''),
       remarks: '',
       scores: {},
       itemRemarks: {},
@@ -903,6 +795,7 @@ const App: React.FC = () => {
     }
 
     syncData(records, updatedSchedules, lecturersList, { syncRecords: false, syncSchedules: true, syncLecturers: false }).catch(console.error);
+    notifyDataChanged();
     showNotification(`Jadual pemantauan baharu (${schedule.lecturerName}) telah berjaya didaftarkan dan disimpan.`, 'success');
   };
 
@@ -926,6 +819,7 @@ const App: React.FC = () => {
     }
 
     syncData(records, updatedSchedules, lecturersList, { syncRecords: false, syncSchedules: true, syncLecturers: false }).catch(console.error);
+    notifyDataChanged();
     showNotification(`Jadual pemantauan (${updatedSchedule.lecturerName}) telah berjaya dikemaskini dan disimpan.`, 'success');
   };
 
@@ -972,6 +866,7 @@ const App: React.FC = () => {
 
     setIsLocalUpdate({ records: true, schedules: true, lecturers: true });
     syncData(updatedRecords, updatedSchedules, updatedLecturers).catch(console.error);
+    notifyDataChanged();
     showNotification(`Maklumat pensyarah (${updatedLecturer.name}) telah berjaya dikemaskini dan disimpan.`, 'success');
   };
 
@@ -1006,6 +901,7 @@ const App: React.FC = () => {
     }
 
     syncData(records, schedules, updatedLecturers, { syncRecords: false, syncSchedules: false, syncLecturers: true }).catch(console.error);
+    notifyDataChanged();
     showNotification(`Pensyarah baharu (${lecturer.name}) telah berjaya didaftarkan dan disimpan.`, 'success');
   };
 
@@ -1271,9 +1167,19 @@ const App: React.FC = () => {
       } catch {}
       showNotification(`${targets.length} orang pensyarah berjaya dipadam daripada data.`, 'success');
     } else if (confirmModal.type === 'schedule' && confirmModal.targetId) {
-      updatedSchedules = schedules.filter((s: MonitoringSchedule) => s.id !== confirmModal.targetId);
+      const scheduleIdToDelete = confirmModal.targetId;
+      fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_schedule', id: scheduleIdToDelete })
+      }).catch(console.warn);
+
+      updatedSchedules = schedules.filter((s: MonitoringSchedule) => s.id !== scheduleIdToDelete);
       setSchedules(updatedSchedules);
       setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
+      try {
+        localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+      } catch {}
       showNotification('Jadual pemantauan berjaya dipadam.', 'success');
     }
 
@@ -1281,6 +1187,7 @@ const App: React.FC = () => {
 
     // Sync to server
     await syncData(updatedRecords, updatedSchedules, updatedLecturers);
+    notifyDataChanged();
   };
 
   // Full dashboard access for all lecturers and ketua jabatan

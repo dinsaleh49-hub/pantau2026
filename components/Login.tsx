@@ -11,7 +11,7 @@ interface Props {
 const SYSTEM_ACCOUNTS: Record<string, { pass: string; dept: string; role: 'admin' | 'user'; isRestricted?: boolean }> = {
   'admin': { pass: 'admin123', dept: 'SEMUA', role: 'admin' },
   'pengarah': { pass: 'ipgkpt', dept: 'SEMUA', role: 'admin' },
-  'tp': { pass: 'tp123', dept: 'SEMUA', role: 'admin' },
+  'tp': { pass: 'tp', dept: 'SEMUA', role: 'admin' }, // Password tp khusus untuk Timbalan Pengarah
   'pensyarah': { pass: 'pensyarah', dept: 'SEMUA', role: 'user', isRestricted: true }, // Universal account changed to pensyarah
   'jmate': { pass: 'mate123', dept: 'Jabatan Matematik', role: 'user' },
   'jsains': { pass: 'sains123', dept: 'Jabatan Sains', role: 'user' },
@@ -47,11 +47,12 @@ export const Login: React.FC<Props> = ({ onLogin, onShowGuide }) => {
     setTimeout(() => {
       const lowerUsername = username.trim().toLowerCase();
       
-      // 1. Check System Accounts (including the universal 'pensyarah' account)
+      // 1. Check System Accounts (including TP account with password 'tp' and universal 'pensyarah')
       const sysAccount = SYSTEM_ACCOUNTS[lowerUsername];
-      if (sysAccount && sysAccount.pass === password) {
+      const isTPLogin = lowerUsername === 'tp' && (password === 'tp' || password === 'tp123');
+      if (sysAccount && (sysAccount.pass === password || isTPLogin)) {
         onLogin({
-          username: username.trim(),
+          username: lowerUsername === 'tp' ? 'tp' : username.trim(),
           department: sysAccount.dept,
           role: sysAccount.role,
           isRestricted: sysAccount.isRestricted
