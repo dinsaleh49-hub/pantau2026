@@ -343,7 +343,41 @@ const postRecords = async (req: any, res: any) => {
     return res.json({ success: true, count: currentRecords.length });
   }
 
-  // Case C: Standard array of records
+  // Case C: Delete single record
+  if (body && body.action === 'delete_record' && body.id) {
+    const targetId = body.id;
+    console.log(`[API] POST /api/records - Deleting record ID: ${targetId}`);
+    let currentRecords: any[] = [];
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('epantau_storage').select('content').eq('id', 'records').maybeSingle();
+        if (Array.isArray(data?.content)) {
+          currentRecords = [...data.content];
+        }
+      } catch (err: any) {}
+    }
+    if (currentRecords.length === 0 && fs.existsSync(RECORDS_FILE)) {
+      try {
+        currentRecords = JSON.parse(fs.readFileSync(RECORDS_FILE, 'utf-8'));
+      } catch {}
+    }
+
+    const filtered = currentRecords.filter((r: any) => r.id !== targetId);
+
+    if (supabase) {
+      try {
+        await supabase.from('epantau_storage').upsert({ id: 'records', content: filtered, updated_at: new Date() });
+      } catch (err: any) {}
+    }
+    if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+      try {
+        fs.writeFileSync(RECORDS_FILE, JSON.stringify(filtered, null, 2));
+      } catch {}
+    }
+    return res.json({ success: true, count: filtered.length });
+  }
+
+  // Case D: Standard array of records
   const records = body;
   const count = Array.isArray(records) ? records.length : 0;
   console.log(`[API] POST /api/records - Saving ${count} records (full array)...`);

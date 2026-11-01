@@ -115,10 +115,10 @@ export const Dashboard: React.FC<Props> = ({
   isRestrictedUser,
   onStartEvaluation
 }) => {
-  const isRestricted = !!isRestrictedUser || (username?.toLowerCase() === 'pensyarah' && userRole === 'user');
+  const isRestricted = false;
   const isAdminView = userRole === 'admin';
-  const canEdit = true; // Diubah supaya pensyarah boleh mengemaskini (update) rekod/jadual jika perlu
-  const canDelete = !isRestricted; // Admin dan Pemantau boleh memadam jika berlaku kesilapan
+  const canEdit = true; // Semua pengguna boleh mengemaskini (update) rekod/jadual jika perlu
+  const canDelete = true; // Semua pensyarah dan Ketua Jabatan boleh memadam rekod pemantauan yang telah diisi jika berlaku kesilapan
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusSearchTerm, setStatusSearchTerm] = useState('');
@@ -1138,7 +1138,7 @@ export const Dashboard: React.FC<Props> = ({
                             className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-700 rounded text-xs font-bold transition-all shadow-sm active:scale-95" 
                             title="Padam Rekod Penilaian Ini"
                           >
-                            <TrashIcon className="h-3.5 w-3.5" /> Padam
+                            <TrashIcon className="h-3.5 w-3.5" /> Padam Rekod
                           </button>
                           </td>
                         </tr>
@@ -1806,7 +1806,7 @@ export const Dashboard: React.FC<Props> = ({
                               className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-700 rounded text-xs font-bold transition-all shadow-sm active:scale-95" 
                               title="Padam Rekod Penilaian Ini"
                             >
-                              <TrashIcon className="h-3.5 w-3.5" /> Padam
+                              <TrashIcon className="h-3.5 w-3.5" /> Padam Rekod
                             </button>
                           </td>
                         </tr>
@@ -1864,62 +1864,101 @@ export const Dashboard: React.FC<Props> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredSchedules.length > 0 ? filteredSchedules.map(s => (
-                <div key={s.id} className="p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:border-indigo-200 transition-all group relative">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
-                      <ClockIcon className="h-5 w-5" />
+              {filteredSchedules.length > 0 ? filteredSchedules.map(s => {
+                const matchingRecord = records.find(r => 
+                  r.lecturerName.trim().toLowerCase() === s.lecturerName.trim().toLowerCase() && 
+                  (r.date === s.date || r.code === s.code)
+                );
+                return (
+                  <div key={s.id} className="p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:border-indigo-200 transition-all group relative">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
+                        <ClockIcon className="h-5 w-5" />
+                      </div>
+                      
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleEditSchedule(s)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm" title="Kemaskini Jadual">
+                          <PencilSquareIcon className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => onDeleteSchedule(s.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm" title="Padam Jadual">
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                        {matchingRecord && (
+                          <button 
+                            onClick={() => onDeleteRecord(matchingRecord.id)} 
+                            className="p-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg shadow-sm" 
+                            title="Padam Rekod Penilaian Pensyarah/KJ Ini"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEditSchedule(s)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm" title="Kemaskini Jadual">
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => onDeleteSchedule(s.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm" title="Padam Jadual">
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                    <div className="space-y-1 mb-4">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-black text-slate-800 leading-tight">{s.lecturerName}</p>
+                        {s.lecturerName.includes('(KJ)') && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
+                        {matchingRecord && (
+                          <span className="bg-emerald-50 text-emerald-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-emerald-200">
+                            ✓ Selesai Dinilai
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{s.department}</p>
                     </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" />
+                        <span>{formatDate(s.date)}</span>
+                        <span className="mx-1">•</span>
+                        <span>{s.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <AcademicCapIcon className="h-3.5 w-3.5 text-indigo-500" />
+                        <span>{s.code} - {s.course}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl w-fit">
+                        <MapPinIcon className="h-3.5 w-3.5" />
+                        <span>{s.location}</span>
+                      </div>
+                    </div>
+                    {matchingRecord ? (
+                      <div className="mt-4 flex gap-2">
+                        <button 
+                          onClick={() => onEditRecord(matchingRecord)} 
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
+                          title="Kemaskini Rekod Penilaian Ini"
+                        >
+                          <PencilSquareIcon className="h-3.5 w-3.5" /> Kemaskini
+                        </button>
+                        <button 
+                          onClick={() => onDeleteRecord(matchingRecord.id)} 
+                          className="flex items-center justify-center gap-1 px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
+                          title="Padam Rekod Penilaian Ini"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" /> Padam Rekod
+                        </button>
+                      </div>
+                    ) : (
+                      onStartEvaluation && (
+                        <button 
+                          onClick={() => onStartEvaluation({ 
+                            lecturerName: s.lecturerName, 
+                            department: s.department, 
+                            course: s.course, 
+                            code: s.code, 
+                            date: s.date 
+                          })}
+                          className="w-full mt-4 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95"
+                          title={`Mula Menilai ${s.lecturerName} untuk kursus ${s.code}`}
+                        >
+                          <ClipboardDocumentCheckIcon className="h-4 w-4" /> Nilai Sesi Ini Sekarang
+                        </button>
+                      )
+                    )}
                   </div>
-                  <div className="space-y-1 mb-4">
-                    <div className="flex items-center gap-2">
-                      <p className="font-black text-slate-800 leading-tight">{s.lecturerName}</p>
-                      {s.lecturerName.includes('(KJ)') && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{s.department}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                      <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" />
-                      <span>{formatDate(s.date)}</span>
-                      <span className="mx-1">•</span>
-                      <span>{s.time}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                      <AcademicCapIcon className="h-3.5 w-3.5 text-indigo-500" />
-                      <span>{s.code} - {s.course}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl w-fit">
-                      <MapPinIcon className="h-3.5 w-3.5" />
-                      <span>{s.location}</span>
-                    </div>
-                  </div>
-                  {!isRestricted && onStartEvaluation && (
-                    <button 
-                      onClick={() => onStartEvaluation({ 
-                        lecturerName: s.lecturerName, 
-                        department: s.department, 
-                        course: s.course, 
-                        code: s.code, 
-                        date: s.date 
-                      })}
-                      className="w-full mt-4 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95"
-                      title={`Mula Menilai ${s.lecturerName} untuk kursus ${s.code}`}
-                    >
-                      <ClipboardDocumentCheckIcon className="h-4 w-4" /> Nilai Sesi Ini Sekarang
-                    </button>
-                  )}
-                </div>
-              )) : (
+                );
+              }) : (
                 <div className="col-span-full py-20 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">
                   <CalendarDaysIcon className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                   <p className="text-sm text-slate-500 font-bold italic">Tiada jadual pemantauan ditemui buat masa ini.</p>

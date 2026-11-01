@@ -85,17 +85,19 @@ const App: React.FC = () => {
   
   const [records, setRecords] = useState<EvaluationRecord[]>(() => {
     try {
+      const deletedIds = new Set<string>(JSON.parse(localStorage.getItem('ipgkpt_deleted_records') || '[]'));
       const saved = localStorage.getItem('ipgkpt_records');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed.filter(r => r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+          const cleaned = parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
           const recMap = new Map<string, EvaluationRecord>();
-          INITIAL_RECORDS.forEach(r => recMap.set(r.id, r));
+          INITIAL_RECORDS.filter(r => !deletedIds.has(r.id)).forEach(r => recMap.set(r.id, r));
           cleaned.forEach(r => recMap.set(r.id, r));
           return Array.from(recMap.values());
         }
       }
+      return INITIAL_RECORDS.filter(r => !deletedIds.has(r.id));
     } catch {}
     return INITIAL_RECORDS;
   });
@@ -299,7 +301,14 @@ const App: React.FC = () => {
         try {
           const recordsData = await recordsSettled.value.json();
           if (Array.isArray(recordsData)) {
-            const cleanedServer = recordsData.filter((r: any) => r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+            let deletedIds = new Set<string>();
+            try {
+              deletedIds = new Set<string>(JSON.parse(localStorage.getItem('ipgkpt_deleted_records') || '[]'));
+            } catch {}
+
+            const cleanedServer = recordsData.filter((r: any) => 
+              r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09'
+            );
             
             // Read local records
             let localRecords: EvaluationRecord[] = [];
@@ -307,17 +316,19 @@ const App: React.FC = () => {
               const saved = localStorage.getItem('ipgkpt_records');
               if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) localRecords = parsed.filter(r => r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+                if (Array.isArray(parsed)) {
+                  localRecords = parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+                }
               }
             } catch {}
 
             const recMap = new Map<string, EvaluationRecord>();
-            INITIAL_RECORDS.forEach(r => recMap.set(r.id, r));
-            cleanedServer.forEach(r => { if (r && r.id) recMap.set(r.id, r); });
+            INITIAL_RECORDS.filter(r => !deletedIds.has(r.id)).forEach(r => recMap.set(r.id, r));
+            cleanedServer.forEach(r => { if (r && r.id && !deletedIds.has(r.id)) recMap.set(r.id, r); });
 
             let hasNewerLocal = false;
             localRecords.forEach(loc => {
-              if (!loc || !loc.id) return;
+              if (!loc || !loc.id || deletedIds.has(loc.id)) return;
               const existing = recMap.get(loc.id);
               if (!existing) {
                 recMap.set(loc.id, loc);
@@ -1011,22 +1022,67 @@ const App: React.FC = () => {
       return;
     }
 
-    const isMonitor = user?.role === 'admin' || (user?.role === 'user' && user?.username.toLowerCase() !== 'pensyarah');
-    if (!isMonitor && (confirmModal.type === 'record' || confirmModal.type === 'lecturer')) {
-      alert('Hanya Admin atau Pemantau dibenarkan memadam rekod atau pensyarah.');
-      setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      return;
-    }
-
+    // All lecturers, ketua jabatan, and admins are authorized to delete evaluation records
     let updatedRecords = [...records];
     let updatedLecturers = [...lecturersList];
     let updatedSchedules = [...schedules];
 
     if (confirmModal.type === 'record' && confirmModal.targetId) {
-      updatedRecords = records.filter((r: EvaluationRecord) => r.id !== confirmModal.targetId);
+      const recordIdToDelete = confirmModal.targetId;
+      const deletedRecord = records.find(r => r.id === recordIdToDelete);
+      
+      // Save to deletedIds list in localStorage so it is never re-seeded
+      try {
+        const existingDeleted = JSON.parse(localStorage.getItem('ipgkpt_deleted_records') || '[]');
+        if (!existingDeleted.includes(recordIdToDelete)) {
+          existingDeleted.push(recordIdToDelete);
+          localStorage.setItem('ipgkpt_deleted_records', JSON.stringify(existingDeleted));
+        }
+      } catch {}
+
+      // Inform server of deleted ID immediately
+      fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_record', id: recordIdToDelete })
+      }).catch(console.warn);
+
+      updatedRecords = records.filter((r: EvaluationRecord) => r.id !== recordIdToDelete);
+      
+      // Update schedule status if this lecturer has no other records left
+      if (deletedRecord) {
+        const remaining = updatedRecords.filter(r => 
+          r.lecturerName.trim().toLowerCase() === deletedRecord.lecturerName.trim().toLowerCase()
+        );
+        if (remaining.length === 0) {
+          updatedSchedules = schedules.map(s => {
+            if (s.lecturerName.trim().toLowerCase() === deletedRecord.lecturerName.trim().toLowerCase()) {
+              return { ...s, status: 'Pending' as const };
+            }
+            return s;
+          });
+          setSchedules(updatedSchedules);
+          try {
+            localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+          } catch {}
+
+          const matchedSchedule = updatedSchedules.find(s => s.lecturerName.trim().toLowerCase() === deletedRecord.lecturerName.trim().toLowerCase());
+          if (matchedSchedule) {
+            fetch('/api/schedules', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'upsert_schedule', schedule: matchedSchedule })
+            }).catch(console.warn);
+          }
+        }
+      }
+
       setRecords(updatedRecords);
-      setIsLocalUpdate(prev => ({ ...prev, records: true }));
-      showNotification('Rekod pemantauan berjaya dipadam.', 'success');
+      setIsLocalUpdate(prev => ({ ...prev, records: true, schedules: true }));
+      try {
+        localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
+      } catch {}
+      showNotification(`Rekod pemantauan bagi ${deletedRecord?.lecturerName || 'pensyarah'} berjaya dipadam.`, 'success');
     } else if (confirmModal.type === 'lecturer' && confirmModal.targetId) {
       const [name, dept] = confirmModal.targetId.split('|');
       updatedLecturers = lecturersList.filter((l: Lecturer) => !(l.name === name && l.department === dept));
@@ -1046,15 +1102,13 @@ const App: React.FC = () => {
     await syncData(updatedRecords, updatedSchedules, updatedLecturers);
   };
 
-  // Restricted user identification
-  const isRestrictedUser = !!user?.isRestricted || (user?.username.toLowerCase() === 'pensyarah' && user?.role === 'user');
+  // Full dashboard access for all lecturers and ketua jabatan
+  const isRestrictedUser = false;
 
-  // Improved filtering to handle universal 'SEMUA' access
-  const accessibleRecords = (user?.role === 'admin' || (user?.department === 'SEMUA' && !isRestrictedUser))
+  // Department users access their department data; admin and universal access all data
+  const accessibleRecords = (user?.role === 'admin' || user?.department === 'SEMUA')
     ? records 
-    : isRestrictedUser 
-      ? [] // Restricted user gets ZERO evaluation records
-      : records.filter(r => r.department === user?.department);
+    : records.filter(r => r.department === user?.department);
 
   const accessibleLecturers = (user?.role === 'admin' || user?.department === 'SEMUA')
     ? lecturersList 
