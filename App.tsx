@@ -88,10 +88,12 @@ const App: React.FC = () => {
       const saved = localStorage.getItem('ipgkpt_records');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = parsed.filter(r => r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
-          if (cleaned.length === 73 && cleaned.every(r => r.date === '2026-10-07')) return cleaned;
-          if (cleaned.length >= 73) return cleaned;
+          const recMap = new Map<string, EvaluationRecord>();
+          INITIAL_RECORDS.forEach(r => recMap.set(r.id, r));
+          cleaned.forEach(r => recMap.set(r.id, r));
+          return Array.from(recMap.values());
         }
       }
     } catch {}
@@ -102,7 +104,12 @@ const App: React.FC = () => {
       const saved = localStorage.getItem('ipgkpt_schedules');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 73 && parsed.some(s => s.date === '2026-10-07')) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const schedMap = new Map<string, MonitoringSchedule>();
+          INITIAL_SCHEDULES.forEach(s => schedMap.set(s.id, s));
+          parsed.forEach(s => schedMap.set(s.id, s));
+          return Array.from(schedMap.values());
+        }
       }
     } catch {}
     return INITIAL_SCHEDULES;
@@ -118,8 +125,21 @@ const App: React.FC = () => {
   const [supabaseStatus, setSupabaseStatus] = useState<string>('unknown');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lecturersList, setLecturersList] = useState<Lecturer[]>(() => {
-    const saved = localStorage.getItem('ipgkpt_lecturers');
-    return saved ? JSON.parse(saved) : LECTURERS;
+    try {
+      const saved = localStorage.getItem('ipgkpt_lecturers');
+      const savedList: Lecturer[] = saved ? JSON.parse(saved) : [];
+      const map = new Map<string, Lecturer>();
+      savedList.forEach(l => {
+        if (l && l.name) map.set(l.name.trim().toLowerCase(), l);
+      });
+      // Canonical LECTURERS authoritative definition
+      LECTURERS.forEach(l => {
+        if (l && l.name) map.set(l.name.trim().toLowerCase(), l);
+      });
+      return Array.from(map.values());
+    } catch {
+      return LECTURERS;
+    }
   });
   // Ruangan tandatangan dikosongkan dan tandatangan terdahulu dipadamkan
   const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>({});
@@ -279,21 +299,45 @@ const App: React.FC = () => {
         try {
           const recordsData = await recordsSettled.value.json();
           if (Array.isArray(recordsData)) {
-            const cleaned = recordsData.filter((r: any) => r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
-            if (cleaned.length >= 73) {
-              setRecords(cleaned);
-              localStorage.setItem('ipgkpt_records', JSON.stringify(cleaned));
-            } else if (cleaned.length > 0 && cleaned.length < 73) {
-              const existingNames = new Set(cleaned.map((r: any) => r.lecturerName?.toLowerCase()));
-              const missingFromInitial = INITIAL_RECORDS.filter(r => !existingNames.has(r.lecturerName.toLowerCase()));
-              const merged = [...cleaned, ...missingFromInitial];
-              setRecords(merged);
-              localStorage.setItem('ipgkpt_records', JSON.stringify(merged));
-              syncRecordsToServerSafely(merged).catch(console.error);
-            } else {
-              setRecords(INITIAL_RECORDS);
-              localStorage.setItem('ipgkpt_records', JSON.stringify(INITIAL_RECORDS));
-              syncRecordsToServerSafely(INITIAL_RECORDS).catch(console.error);
+            const cleanedServer = recordsData.filter((r: any) => r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+            
+            // Read local records
+            let localRecords: EvaluationRecord[] = [];
+            try {
+              const saved = localStorage.getItem('ipgkpt_records');
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) localRecords = parsed.filter(r => r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+              }
+            } catch {}
+
+            const recMap = new Map<string, EvaluationRecord>();
+            INITIAL_RECORDS.forEach(r => recMap.set(r.id, r));
+            cleanedServer.forEach(r => { if (r && r.id) recMap.set(r.id, r); });
+
+            let hasNewerLocal = false;
+            localRecords.forEach(loc => {
+              if (!loc || !loc.id) return;
+              const existing = recMap.get(loc.id);
+              if (!existing) {
+                recMap.set(loc.id, loc);
+                hasNewerLocal = true;
+              } else {
+                const locTime = loc.timestamp || 0;
+                const existTime = existing.timestamp || 0;
+                if (locTime > existTime) {
+                  recMap.set(loc.id, loc);
+                  hasNewerLocal = true;
+                }
+              }
+            });
+
+            const mergedRecords = Array.from(recMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            setRecords(mergedRecords);
+            localStorage.setItem('ipgkpt_records', JSON.stringify(mergedRecords));
+
+            if (hasNewerLocal || cleanedServer.length < mergedRecords.length) {
+              syncRecordsToServerSafely(mergedRecords).catch(console.error);
             }
           }
         } catch (e) {
@@ -306,27 +350,46 @@ const App: React.FC = () => {
         try {
           const schedulesData = await schedulesSettled.value.json();
           if (Array.isArray(schedulesData)) {
-            if (schedulesData.length >= 73) {
-              setSchedules(schedulesData);
-              localStorage.setItem('ipgkpt_schedules', JSON.stringify(schedulesData));
-            } else if (schedulesData.length > 0 && schedulesData.length < 73) {
-              const existingNames = new Set(schedulesData.map((s: any) => s.lecturerName?.toLowerCase()));
-              const missingFromInitial = INITIAL_SCHEDULES.filter(s => !existingNames.has(s.lecturerName.toLowerCase()));
-              const merged = [...schedulesData, ...missingFromInitial];
-              setSchedules(merged);
-              localStorage.setItem('ipgkpt_schedules', JSON.stringify(merged));
+            let localSchedules: MonitoringSchedule[] = [];
+            try {
+              const saved = localStorage.getItem('ipgkpt_schedules');
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) localSchedules = parsed;
+              }
+            } catch {}
+
+            const schedMap = new Map<string, MonitoringSchedule>();
+            INITIAL_SCHEDULES.forEach(s => schedMap.set(s.id, s));
+            schedulesData.forEach(s => { if (s && s.id) schedMap.set(s.id, s); });
+
+            let hasNewerLocal = false;
+            localSchedules.forEach(loc => {
+              if (!loc || !loc.id) return;
+              const existing = schedMap.get(loc.id);
+              if (!existing) {
+                schedMap.set(loc.id, loc);
+                hasNewerLocal = true;
+              } else {
+                if (loc.status === 'Completed' && existing.status !== 'Completed') {
+                  schedMap.set(loc.id, loc);
+                  hasNewerLocal = true;
+                } else if ((loc.timestamp || 0) > (existing.timestamp || 0)) {
+                  schedMap.set(loc.id, loc);
+                  hasNewerLocal = true;
+                }
+              }
+            });
+
+            const mergedSchedules = Array.from(schedMap.values());
+            setSchedules(mergedSchedules);
+            localStorage.setItem('ipgkpt_schedules', JSON.stringify(mergedSchedules));
+
+            if (hasNewerLocal || schedulesData.length < mergedSchedules.length) {
               fetch('/api/schedules', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(merged)
-              }).catch(console.error);
-            } else {
-              setSchedules(INITIAL_SCHEDULES);
-              localStorage.setItem('ipgkpt_schedules', JSON.stringify(INITIAL_SCHEDULES));
-              fetch('/api/schedules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(INITIAL_SCHEDULES)
+                body: JSON.stringify(mergedSchedules)
               }).catch(console.error);
             }
           }
@@ -339,25 +402,43 @@ const App: React.FC = () => {
         anySuccess = true;
         try {
           const lecturersData = await lecturersSettled.value.json();
-          if (Array.isArray(lecturersData)) {
-            if (lecturersData.length > 0) {
-              setLecturersList(lecturersData);
-              localStorage.setItem('ipgkpt_lecturers', JSON.stringify(lecturersData));
-            } else {
-              const saved = localStorage.getItem('ipgkpt_lecturers');
-              const localLecturers = saved ? JSON.parse(saved) : [];
-              if (localLecturers.length > 0) {
-                setLecturersList(localLecturers);
-                fetch('/api/lecturers', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(localLecturers)
-                }).catch(console.error);
-              } else {
-                setLecturersList(LECTURERS);
-                localStorage.setItem('ipgkpt_lecturers', JSON.stringify(LECTURERS));
-              }
+          const serverList: Lecturer[] = Array.isArray(lecturersData) ? lecturersData : [];
+
+          let localLecturers: Lecturer[] = [];
+          try {
+            const saved = localStorage.getItem('ipgkpt_lecturers');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) localLecturers = parsed;
             }
+          } catch {}
+
+          const lecMap = new Map<string, Lecturer>();
+          serverList.forEach(l => {
+            if (l && l.name) lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+          });
+          localLecturers.forEach(l => {
+            if (l && l.name) lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+          });
+          LECTURERS.forEach(l => {
+            if (l && l.name) lecMap.set(l.name.trim().toLowerCase(), { name: l.name.trim(), department: l.department });
+          });
+
+          const mergedLecturers = Array.from(lecMap.values());
+          setLecturersList(mergedLecturers);
+          localStorage.setItem('ipgkpt_lecturers', JSON.stringify(mergedLecturers));
+
+          const needsServerSync = serverList.length !== mergedLecturers.length || serverList.some(s => {
+            const m = lecMap.get(s.name.trim().toLowerCase());
+            return m && m.department !== s.department;
+          });
+
+          if (needsServerSync) {
+            fetch('/api/lecturers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(mergedLecturers)
+            }).catch(console.error);
           }
         } catch (e) {
           console.warn("Failed to parse lecturers data:", e);
@@ -618,14 +699,29 @@ const App: React.FC = () => {
       : [normalizedRecord, ...records];
 
     // Smart schedule matching: match by lecturer name case-insensitively, and mark completed if date matches or pending
+    let matchedSchedule = false;
     const updatedSchedules = schedules.map(s => {
       const isLecturerMatch = s.lecturerName.trim().toLowerCase() === trimmedName.toLowerCase();
       if (!isLecturerMatch) return s;
-      if (s.date === normalizedRecord.date || s.status === 'Pending') {
-        return { ...s, status: 'Completed' as const };
-      }
-      return s;
+      matchedSchedule = true;
+      return { ...s, status: 'Completed' as const, date: normalizedRecord.date || s.date };
     });
+
+    if (!matchedSchedule && trimmedName) {
+      const newScheduleEntry: MonitoringSchedule = {
+        id: `sch-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        lecturerName: trimmedName,
+        department: normalizedRecord.department,
+        course: normalizedRecord.course || 'Pemantauan PdP',
+        code: normalizedRecord.code || '',
+        date: normalizedRecord.date || new Date().toISOString().split('T')[0],
+        time: '08:00',
+        location: 'Bilik Kuliah / Makmal',
+        timestamp: normalizedRecord.timestamp || Date.now(),
+        status: 'Completed'
+      };
+      updatedSchedules.unshift(newScheduleEntry);
+    }
 
     // Update state immediately for instant responsive feedback
     setLecturersList(updatedLecturers);
@@ -650,9 +746,22 @@ const App: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'upsert_record', record: normalizedRecord })
       });
-      console.log("[App] Direct upsert to server succeeded for:", normalizedRecord.id);
+      console.log("[App] Direct upsert to server succeeded for record:", normalizedRecord.id);
     } catch (upsertErr) {
       console.warn("[App] Direct upsert to server warning (will be resolved by syncData):", upsertErr);
+    }
+
+    const scheduleToUpsert = updatedSchedules.find(s => s.lecturerName.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (scheduleToUpsert) {
+      try {
+        await fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'upsert_schedule', schedule: scheduleToUpsert })
+        });
+      } catch (schedErr) {
+        console.warn("[App] Direct schedule upsert warning:", schedErr);
+      }
     }
 
     // Clear temporary in-progress form draft from storage
