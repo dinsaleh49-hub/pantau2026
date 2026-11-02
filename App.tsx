@@ -285,12 +285,41 @@ const App: React.FC = () => {
         fetch('/api/schedules'),
         fetch('/api/lecturers'),
         fetch('/api/health'),
-        fetch('/api/signatures')
+        fetch('/api/signatures'),
+        fetch('/api/deleted-schedules')
       ]);
 
-      const [recordsSettled, schedulesSettled, lecturersSettled, healthSettled, signaturesSettled] = results;
+      const [recordsSettled, schedulesSettled, lecturersSettled, healthSettled, signaturesSettled, deletedSchedsSettled] = results;
 
       let anySuccess = false;
+
+      // Parse server-side deleted schedule IDs for cross-device synchronization
+      const deletedSchedIds = new Set<string>();
+      try {
+        const savedDel = localStorage.getItem('ipgkpt_deleted_schedules');
+        if (savedDel) {
+          const parsedDel = JSON.parse(savedDel);
+          if (Array.isArray(parsedDel)) {
+            parsedDel.forEach((id: string) => deletedSchedIds.add(id));
+          }
+        }
+      } catch {}
+
+      if (deletedSchedsSettled && deletedSchedsSettled.status === 'fulfilled' && deletedSchedsSettled.value.ok) {
+        try {
+          const serverDeletedScheds = await deletedSchedsSettled.value.json();
+          if (Array.isArray(serverDeletedScheds)) {
+            serverDeletedScheds.forEach((id: string) => deletedSchedIds.add(id));
+          }
+        } catch (e) {
+          console.warn("Failed to parse deleted schedules data:", e);
+        }
+      }
+
+      // Persist the combined set of deleted schedule IDs back to localStorage
+      try {
+        localStorage.setItem('ipgkpt_deleted_schedules', JSON.stringify(Array.from(deletedSchedIds)));
+      } catch {}
 
       if (healthSettled.status === 'fulfilled' && healthSettled.value.ok) {
         anySuccess = true;
@@ -370,17 +399,7 @@ const App: React.FC = () => {
         try {
           const schedulesData = await schedulesSettled.value.json();
           if (Array.isArray(schedulesData)) {
-            const deletedSchedIds = new Set<string>();
-            try {
-              const savedDel = localStorage.getItem('ipgkpt_deleted_schedules');
-              if (savedDel) {
-                const parsedDel = JSON.parse(savedDel);
-                if (Array.isArray(parsedDel)) {
-                  parsedDel.forEach((id: string) => deletedSchedIds.add(id));
-                }
-              }
-            } catch {}
-
+            // Read and purge local schedules of any deleted IDs so deleted schedules NEVER resurrect across devices
             let localSchedules: MonitoringSchedule[] = [];
             try {
               const saved = localStorage.getItem('ipgkpt_schedules');
@@ -402,6 +421,7 @@ const App: React.FC = () => {
               if (!loc || !loc.id || deletedSchedIds.has(loc.id)) return;
               const existing = schedMap.get(loc.id);
               if (!existing) {
+                // Only if newly added schedule locally that was never deleted
                 schedMap.set(loc.id, loc);
                 hasNewerLocal = true;
               } else if (loc.status === 'Completed' && existing.status !== 'Completed') {
@@ -873,6 +893,15 @@ const App: React.FC = () => {
   };
 
   const handleAddSchedule = async (schedule: MonitoringSchedule) => {
+    // Ensure this schedule ID is not marked as deleted
+    try {
+      const existingDeleted: string[] = JSON.parse(localStorage.getItem('ipgkpt_deleted_schedules') || '[]');
+      if (existingDeleted.includes(schedule.id)) {
+        const filtered = existingDeleted.filter(id => id !== schedule.id);
+        localStorage.setItem('ipgkpt_deleted_schedules', JSON.stringify(filtered));
+      }
+    } catch {}
+
     const updatedSchedules = [schedule, ...schedules];
     setSchedules(updatedSchedules);
     setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
@@ -897,6 +926,15 @@ const App: React.FC = () => {
   };
 
   const handleUpdateSchedule = async (updatedSchedule: MonitoringSchedule) => {
+    // Ensure updated schedule ID is not marked as deleted
+    try {
+      const existingDeleted: string[] = JSON.parse(localStorage.getItem('ipgkpt_deleted_schedules') || '[]');
+      if (existingDeleted.includes(updatedSchedule.id)) {
+        const filtered = existingDeleted.filter(id => id !== updatedSchedule.id);
+        localStorage.setItem('ipgkpt_deleted_schedules', JSON.stringify(filtered));
+      }
+    } catch {}
+
     const updatedSchedules = schedules.map((s: MonitoringSchedule) => s.id === updatedSchedule.id ? updatedSchedule : s);
     setSchedules(updatedSchedules);
     setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
@@ -1069,6 +1107,7 @@ const App: React.FC = () => {
 
   const openDeleteMultipleSchedulesConfirm = (scheduleIds: string[]) => {
     if (!scheduleIds || scheduleIds.length === 0) return;
+    const isAll = scheduleIds.length >= schedules.length;
     const matchingScheds = schedules.filter(s => scheduleIds.includes(s.id));
     const names = Array.from(new Set(matchingScheds.map(s => s.lecturerName)));
     const namesPreview = names.slice(0, 3).join(', ') + (names.length > 3 ? ` dan ${names.length - 3} lagi` : '');
@@ -1077,9 +1116,11 @@ const App: React.FC = () => {
       type: 'multiple_schedules',
       targetId: null,
       targetScheduleIds: scheduleIds,
-      title: `Padam ${scheduleIds.length} Jadual Pemantauan?`,
-      message: `Adakah anda pasti mahu memadam ${scheduleIds.length} jadual pemantauan yang dipilih (${namesPreview}) secara kekal? Tindakan ini boleh dilakukan oleh semua pensyarah dan Ketua Jabatan jika berlaku sebarang kesilapan.`,
-      confirmText: `Ya, Padam (${scheduleIds.length}) Jadual`
+      title: isAll ? `Padam Jadual Untuk Semua Pensyarah (${scheduleIds.length})?` : `Padam ${scheduleIds.length} Jadual Pemantauan?`,
+      message: isAll
+        ? `Adakah anda pasti mahu memadam jadual pemantauan untuk SEMUA pensyarah (${scheduleIds.length} jadual) secara kekal? Tindakan ini boleh dilakukan oleh semua pensyarah dan Ketua Jabatan, dan akan diselaraskan serta-merta ke semua peranti.`
+        : `Adakah anda pasti mahu memadam ${scheduleIds.length} jadual pemantauan yang dipilih (${namesPreview}) secara kekal? Tindakan ini boleh dilakukan oleh semua pensyarah dan Ketua Jabatan jika berlaku sebarang kesilapan, dan akan diselaraskan ke semua peranti.`,
+      confirmText: isAll ? `Ya, Padam Semua (${scheduleIds.length}) Jadual` : `Ya, Padam (${scheduleIds.length}) Jadual`
     });
   };
 
@@ -1098,6 +1139,7 @@ const App: React.FC = () => {
           setSchedules(INITIAL_SCHEDULES);
           localStorage.setItem('ipgkpt_records', JSON.stringify(INITIAL_RECORDS));
           localStorage.setItem('ipgkpt_schedules', JSON.stringify(INITIAL_SCHEDULES));
+          localStorage.removeItem('ipgkpt_deleted_schedules');
           showNotification('Berjaya memulihkan 73 rekod pemantauan pensyarah (7.10.2026)!', 'success');
         } else {
           showNotification(`Gagal memulihkan: ${data.error || 'Ralat server'}`, 'error');
@@ -1107,6 +1149,7 @@ const App: React.FC = () => {
         setSchedules(INITIAL_SCHEDULES);
         localStorage.setItem('ipgkpt_records', JSON.stringify(INITIAL_RECORDS));
         localStorage.setItem('ipgkpt_schedules', JSON.stringify(INITIAL_SCHEDULES));
+        localStorage.removeItem('ipgkpt_deleted_schedules');
         showNotification('Data 73 orang pensyarah berjaya dipulihkan.', 'success');
       } finally {
         setIsSyncing(false);
@@ -1294,11 +1337,15 @@ const App: React.FC = () => {
         }
       } catch {}
 
-      fetch('/api/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_schedule', id: scheduleIdToDelete })
-      }).catch(console.warn);
+      try {
+        await fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete_schedule', id: scheduleIdToDelete })
+        });
+      } catch (e) {
+        console.warn("Direct schedule delete error:", e);
+      }
 
       updatedSchedules = schedules.filter((s: MonitoringSchedule) => s.id !== scheduleIdToDelete);
       setSchedules(updatedSchedules);
@@ -1306,7 +1353,7 @@ const App: React.FC = () => {
       try {
         localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
       } catch {}
-      showNotification(`Jadual pemantauan bagi ${targetSchedule?.lecturerName || 'pensyarah'} berjaya dipadam.`, 'success');
+      showNotification(`Jadual pemantauan bagi ${targetSchedule?.lecturerName || 'pensyarah'} berjaya dipadam dan diselaraskan ke semua peranti.`, 'success');
     } else if (confirmModal.type === 'multiple_schedules' && confirmModal.targetScheduleIds) {
       const idsToDelete = new Set(confirmModal.targetScheduleIds);
 
@@ -1319,11 +1366,15 @@ const App: React.FC = () => {
         localStorage.setItem('ipgkpt_deleted_schedules', JSON.stringify(existingDeleted));
       } catch {}
 
-      fetch('/api/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_schedules', ids: confirmModal.targetScheduleIds })
-      }).catch(console.warn);
+      try {
+        await fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete_schedules', ids: confirmModal.targetScheduleIds })
+        });
+      } catch (e) {
+        console.warn("Direct multiple schedules delete error:", e);
+      }
 
       updatedSchedules = schedules.filter((s: MonitoringSchedule) => !idsToDelete.has(s.id));
       setSchedules(updatedSchedules);
@@ -1331,13 +1382,22 @@ const App: React.FC = () => {
       try {
         localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
       } catch {}
-      showNotification(`${confirmModal.targetScheduleIds.length} jadual pemantauan berjaya dipadam secara kekal.`, 'success');
+
+      const isAll = confirmModal.targetScheduleIds.length >= schedules.length;
+      showNotification(isAll 
+        ? `Jadual pemantauan bagi SEMUA pensyarah (${confirmModal.targetScheduleIds.length} jadual) berjaya dipadam secara kekal di semua peranti.`
+        : `${confirmModal.targetScheduleIds.length} jadual pemantauan berjaya dipadam secara kekal di semua peranti.`,
+        'success'
+      );
     }
 
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
-    // Sync to server
-    await syncData(updatedRecords, updatedSchedules, updatedLecturers);
+    // Sync to server: if schedules were deleted, skip syncSchedules since delete_schedule(s) was already sent with tombstones
+    const isScheduleDelete = confirmModal.type === 'schedule' || confirmModal.type === 'multiple_schedules';
+    await syncData(updatedRecords, updatedSchedules, updatedLecturers, {
+      syncSchedules: !isScheduleDelete
+    });
     notifyDataChanged();
   };
 

@@ -346,6 +346,16 @@ export const Dashboard: React.FC<Props> = ({
     setSelectedScheduleIds(new Set());
   };
 
+  const handleDeleteAllSchedules = (targetSchedules: MonitoringSchedule[]) => {
+    if (!targetSchedules || targetSchedules.length === 0) return;
+    const ids = targetSchedules.map(s => s.id);
+    if (onDeleteMultipleSchedules) {
+      onDeleteMultipleSchedules(ids);
+    } else {
+      ids.forEach(id => onDeleteSchedule(id));
+    }
+  };
+
   // Lecturers, Records, and Schedules strictly scoped when viewing a department
   const currentDeptLecturers = useMemo(() => {
     if (isDeptView) {
@@ -2453,6 +2463,16 @@ export const Dashboard: React.FC<Props> = ({
                   />
                   <span className="text-[10px] font-black uppercase text-slate-700">Pilih Semua ({filteredSchedules.length})</span>
                 </label>
+                <button 
+                  type="button"
+                  onClick={() => handleDeleteAllSchedules(filteredSchedules)}
+                  disabled={filteredSchedules.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 hover:text-rose-800 rounded-xl text-xs font-black shadow-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Padam jadual pemantauan untuk semua pensyarah sekaligus dan selaraskan ke semua peranti"
+                >
+                  <TrashIcon className="h-4 w-4 text-rose-600" />
+                  <span>Padam Jadual Semua Pensyarah ({filteredSchedules.length})</span>
+                </button>
                 <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all select-none">
                   <input type="checkbox" checked={onlyKJSchedule} onChange={e => setOnlyKJSchedule(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
                   <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>

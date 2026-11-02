@@ -27,6 +27,7 @@ const RECORDS_FILE = path.join(DATA_DIR, "records.json");
 const SCHEDULES_FILE = path.join(DATA_DIR, "schedules.json");
 const LECTURERS_FILE = path.join(DATA_DIR, "lecturers.json");
 const SIGNATURES_FILE = path.join(DATA_DIR, "signatures.json");
+const DELETED_SCHEDULES_FILE = path.join(DATA_DIR, "deleted_schedules.json");
 const INITIAL_RECORDS_FILE = path.join(DATA_DIR, "initial_records.json");
 const INITIAL_SCHEDULES_FILE = path.join(DATA_DIR, "initial_schedules.json");
 const INITIAL_LECTURERS_FILE = path.join(DATA_DIR, "initial_lecturers.json");
@@ -63,6 +64,9 @@ if (!process.env.VERCEL) {
       fs.copyFileSync(INITIAL_SIGNATURES_FILE, SIGNATURES_FILE);
     } else if (!fs.existsSync(SIGNATURES_FILE)) {
       fs.writeFileSync(SIGNATURES_FILE, JSON.stringify({}, null, 2));
+    }
+    if (!fs.existsSync(DELETED_SCHEDULES_FILE)) {
+      fs.writeFileSync(DELETED_SCHEDULES_FILE, JSON.stringify([], null, 2));
     }
   } catch (initErr: any) {
     console.warn(`[API] Could not initialize default JSON files:`, initErr.message);
@@ -426,37 +430,104 @@ const postRecords = async (req: any, res: any) => {
   }
 };
 
+// Helper functions for deleted schedules tombstone persistence
+const getDeletedSchedulesList = async (): Promise<string[]> => {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('epantau_storage').select('content').eq('id', 'deleted_schedules').maybeSingle();
+      if (Array.isArray(data?.content)) {
+        if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+          try { fs.writeFileSync(DELETED_SCHEDULES_FILE, JSON.stringify(data.content, null, 2)); } catch {}
+        }
+        return data.content;
+      }
+    } catch (e) {
+      console.warn("[API] Supabase read error for deleted_schedules:", e);
+    }
+  }
+  if (fs.existsSync(DELETED_SCHEDULES_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(DELETED_SCHEDULES_FILE, 'utf-8'));
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return [];
+};
+
+const saveDeletedSchedulesList = async (ids: string[]): Promise<void> => {
+  const uniqueIds = Array.from(new Set(ids));
+  if (supabase) {
+    try {
+      await supabase.from('epantau_storage').upsert({ id: 'deleted_schedules', content: uniqueIds, updated_at: new Date() });
+    } catch (e) {
+      console.error("[API] Supabase write error for deleted_schedules:", e);
+    }
+  }
+  if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+    try {
+      fs.writeFileSync(DELETED_SCHEDULES_FILE, JSON.stringify(uniqueIds, null, 2));
+    } catch {}
+  }
+};
+
+const getDeletedSchedules = async (req: any, res: any) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  const ids = await getDeletedSchedulesList();
+  res.json(ids);
+};
+
+const postDeletedSchedules = async (req: any, res: any) => {
+  const incomingIds = Array.isArray(req.body?.ids) ? req.body.ids : (Array.isArray(req.body) ? req.body : []);
+  if (incomingIds.length === 0) {
+    return res.json({ success: true, count: 0 });
+  }
+  const current = await getDeletedSchedulesList();
+  const merged = Array.from(new Set([...current, ...incomingIds]));
+  await saveDeletedSchedulesList(merged);
+  res.json({ success: true, count: merged.length, deletedIds: merged });
+};
+
 const getSchedules = async (req: any, res: any) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  const deletedIds = new Set(await getDeletedSchedulesList());
+
   if (supabase) {
     try {
       const { data, error } = await supabase.from('epantau_storage').select('content').eq('id', 'schedules').maybeSingle();
       if (error) throw error;
-      const scheds = data?.content;
-      if (Array.isArray(scheds) && scheds.length > 0) {
+      
+      // If the row exists in Supabase (even if empty []), respect user deletion!
+      if (data && Array.isArray(data.content)) {
+        const cleaned = data.content.filter((s: any) => s && s.id && !deletedIds.has(s.id));
         if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
           try {
-            fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(scheds, null, 2));
+            fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(cleaned, null, 2));
           } catch {}
         }
-        return res.json(scheds);
+        return res.json(cleaned);
       }
-      if (fs.existsSync(INITIAL_SCHEDULES_FILE)) {
+      
+      // Only seed initial if row has NEVER been created in Supabase
+      if (!data && fs.existsSync(INITIAL_SCHEDULES_FILE)) {
         const initial = JSON.parse(fs.readFileSync(INITIAL_SCHEDULES_FILE, "utf-8"));
         if (Array.isArray(initial) && initial.length > 0) {
+          const cleaned = initial.filter((s: any) => s && s.id && !deletedIds.has(s.id));
           try {
-            await supabase.from('epantau_storage').upsert({ id: 'schedules', content: initial, updated_at: new Date() });
+            await supabase.from('epantau_storage').upsert({ id: 'schedules', content: cleaned, updated_at: new Date() });
           } catch (upsertErr) {
             console.error("[API] Error seeding Supabase schedules:", upsertErr);
           }
-          return res.json(initial);
+          return res.json(cleaned);
         }
       }
       return res.json([]);
     } catch (err: any) {
       if (fs.existsSync(SCHEDULES_FILE)) {
         try {
-          return res.json(JSON.parse(fs.readFileSync(SCHEDULES_FILE, "utf-8")));
+          const parsed = JSON.parse(fs.readFileSync(SCHEDULES_FILE, "utf-8"));
+          if (Array.isArray(parsed)) {
+            return res.json(parsed.filter((s: any) => s && s.id && !deletedIds.has(s.id)));
+          }
         } catch {}
       }
       return res.status(500).json({ error: err.message });
@@ -467,12 +538,12 @@ const getSchedules = async (req: any, res: any) => {
         const content = fs.readFileSync(SCHEDULES_FILE, "utf-8");
         const parsed = JSON.parse(content);
         if (Array.isArray(parsed)) {
-          return res.json(parsed);
+          return res.json(parsed.filter((s: any) => s && s.id && !deletedIds.has(s.id)));
         }
       }
       if (fs.existsSync(INITIAL_SCHEDULES_FILE)) {
         const initial = JSON.parse(fs.readFileSync(INITIAL_SCHEDULES_FILE, "utf-8"));
-        return res.json(initial);
+        return res.json(initial.filter((s: any) => s && s.id && !deletedIds.has(s.id)));
       }
       res.json([]);
     } catch (e) { res.json([]); }
@@ -481,11 +552,20 @@ const getSchedules = async (req: any, res: any) => {
 
 const postSchedules = async (req: any, res: any) => {
   const body = req.body;
+  const deletedIdsList = await getDeletedSchedulesList();
+  const deletedSet = new Set(deletedIdsList);
 
-  // Single schedule upsert/update (fast and direct)
+  // Case A: Single schedule upsert/update (fast and direct)
   if (body && body.action === 'upsert_schedule' && body.schedule) {
     const single = body.schedule;
     console.log(`[API] POST /api/schedules - Direct upsert for schedule ID: ${single.id} (${single.lecturerName})`);
+    
+    // Revive if it was previously in deleted list
+    if (deletedSet.has(single.id)) {
+      deletedSet.delete(single.id);
+      await saveDeletedSchedulesList(Array.from(deletedSet));
+    }
+
     let currentSchedules: any[] = [];
     if (supabase) {
       try {
@@ -496,9 +576,6 @@ const postSchedules = async (req: any, res: any) => {
     if (currentSchedules.length === 0 && fs.existsSync(SCHEDULES_FILE)) {
       try { currentSchedules = JSON.parse(fs.readFileSync(SCHEDULES_FILE, 'utf-8')); } catch {}
     }
-    if (currentSchedules.length === 0 && fs.existsSync(INITIAL_SCHEDULES_FILE)) {
-      try { currentSchedules = JSON.parse(fs.readFileSync(INITIAL_SCHEDULES_FILE, 'utf-8')); } catch {}
-    }
 
     const idx = currentSchedules.findIndex((s: any) => s.id === single.id);
     if (idx !== -1) {
@@ -506,6 +583,9 @@ const postSchedules = async (req: any, res: any) => {
     } else {
       currentSchedules.unshift(single);
     }
+
+    // Filter against tombstones
+    currentSchedules = currentSchedules.filter((s: any) => s && s.id && !deletedSet.has(s.id));
 
     if (supabase) {
       try {
@@ -520,12 +600,12 @@ const postSchedules = async (req: any, res: any) => {
     return res.json({ success: true, count: currentSchedules.length });
   }
 
-  // Delete single or multiple schedules
-  if (body && ((body.action === 'delete_schedule' && body.id) || (body.action === 'delete_schedules' && Array.isArray(body.ids)))) {
-    const idsToDelete = new Set<string>(
-      body.action === 'delete_schedules' && Array.isArray(body.ids) ? body.ids : [body.id]
-    );
-    console.log(`[API] POST /api/schedules - Deleting ${idsToDelete.size} schedules...`);
+  // Case B: Delete single, multiple, or all schedules
+  if (body && (
+    (body.action === 'delete_schedule' && body.id) || 
+    (body.action === 'delete_schedules' && Array.isArray(body.ids)) ||
+    (body.action === 'delete_all_schedules' || body.action === 'clear_all_schedules')
+  )) {
     let currentSchedules: any[] = [];
     if (supabase) {
       try {
@@ -536,6 +616,25 @@ const postSchedules = async (req: any, res: any) => {
     if (currentSchedules.length === 0 && fs.existsSync(SCHEDULES_FILE)) {
       try { currentSchedules = JSON.parse(fs.readFileSync(SCHEDULES_FILE, 'utf-8')); } catch {}
     }
+
+    const idsToDelete = new Set<string>();
+    if (body.action === 'delete_schedule' && body.id) {
+      idsToDelete.add(body.id);
+    } else if (body.action === 'delete_schedules' && Array.isArray(body.ids)) {
+      body.ids.forEach((id: string) => idsToDelete.add(id));
+    } else if (body.action === 'delete_all_schedules' || body.action === 'clear_all_schedules') {
+      currentSchedules.forEach((s: any) => { if (s?.id) idsToDelete.add(s.id); });
+      if (Array.isArray(body.ids)) {
+        body.ids.forEach((id: string) => idsToDelete.add(id));
+      }
+    }
+
+    console.log(`[API] POST /api/schedules - Registering ${idsToDelete.size} deleted schedules in tombstones...`);
+
+    // Add to persistent deleted_schedules tombstone set
+    idsToDelete.forEach(id => deletedSet.add(id));
+    await saveDeletedSchedulesList(Array.from(deletedSet));
+
     const filtered = currentSchedules.filter((s: any) => !idsToDelete.has(s.id));
     if (supabase) {
       try {
@@ -545,30 +644,28 @@ const postSchedules = async (req: any, res: any) => {
     if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
       try { fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(filtered, null, 2)); } catch {}
     }
-    return res.json({ success: true, count: filtered.length });
+    return res.json({ success: true, count: filtered.length, deletedCount: idsToDelete.size, deletedIds: Array.from(deletedSet) });
   }
 
+  // Case C: Standard array of schedules
   const schedules = body;
-  const count = Array.isArray(schedules) ? schedules.length : 0;
-  console.log(`[API] POST /api/schedules - Saving ${count} schedules...`);
-
   if (!Array.isArray(schedules)) {
     return res.status(400).json({ error: "Payload must be an array of schedules" });
   }
 
-  if (count === 0) {
-    console.warn("[API] Ignored empty schedules save request to protect existing data");
-    return res.json({ success: true, message: "Ignored empty payload to protect existing data" });
-  }
+  // Filter out any schedules that are in the deleted tombstones list
+  const sanitizedSchedules = schedules.filter((s: any) => s && s.id && !deletedSet.has(s.id));
+  const count = sanitizedSchedules.length;
+  console.log(`[API] POST /api/schedules - Saving ${count} active schedules (filtered against ${deletedSet.size} deleted IDs)...`);
 
   if (supabase) {
     try {
-      const { error } = await supabase.from('epantau_storage').upsert({ id: 'schedules', content: schedules, updated_at: new Date() });
+      const { error } = await supabase.from('epantau_storage').upsert({ id: 'schedules', content: sanitizedSchedules, updated_at: new Date() });
       if (error) {
         console.error("[API] Supabase error saving schedules:", error);
         return res.status(500).json({ error: error.message });
       }
-      res.json({ success: true });
+      res.json({ success: true, count });
     } catch (err: any) {
       console.error("[API] Exception saving schedules to Supabase:", err);
       res.status(500).json({ error: err.message });
@@ -576,9 +673,9 @@ const postSchedules = async (req: any, res: any) => {
   } else {
     if (process.env.VERCEL) return res.status(503).json({ error: "Supabase required for Vercel persistence" });
     try {
-      fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(schedules, null, 2));
+      fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(sanitizedSchedules, null, 2));
       console.log(`[API] Schedules saved to local file: ${SCHEDULES_FILE}`);
-      res.json({ success: true });
+      res.json({ success: true, count });
     } catch (err: any) {
       console.error("[API] Error writing local schedules file:", err);
       res.status(500).json({ error: err.message });
@@ -860,6 +957,9 @@ const postRestore = async (req: any, res: any) => {
       ? JSON.parse(fs.readFileSync(INITIAL_SCHEDULES_FILE, "utf-8"))
       : [];
 
+    // Clear deleted tombstones so restored schedules can be viewed on all devices
+    await saveDeletedSchedulesList([]);
+
     if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
       fs.writeFileSync(RECORDS_FILE, JSON.stringify(initialRecords, null, 2));
       if (initialSchedules.length > 0) {
@@ -873,7 +973,8 @@ const postRestore = async (req: any, res: any) => {
         if (initialSchedules.length > 0) {
           await supabase.from('epantau_storage').upsert({ id: 'schedules', content: initialSchedules, updated_at: new Date() });
         }
-        console.log("[API] Records successfully restored to Supabase.");
+        await supabase.from('epantau_storage').upsert({ id: 'deleted_schedules', content: [], updated_at: new Date() });
+        console.log("[API] Records and schedules successfully restored to Supabase.");
       } catch (sbErr: any) {
         console.error("[API] Error restoring records to Supabase:", sbErr);
       }
@@ -910,6 +1011,11 @@ app.get("/api/schedules", getSchedules);
 app.get("/schedules", getSchedules);
 app.post("/api/schedules", postSchedules);
 app.post("/schedules", postSchedules);
+
+app.get("/api/deleted-schedules", getDeletedSchedules);
+app.get("/deleted-schedules", getDeletedSchedules);
+app.post("/api/deleted-schedules", postDeletedSchedules);
+app.post("/deleted-schedules", postDeletedSchedules);
 
 app.get("/api/lecturers", getLecturers);
 app.get("/lecturers", getLecturers);
