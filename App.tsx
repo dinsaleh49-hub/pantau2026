@@ -370,21 +370,36 @@ const App: React.FC = () => {
         try {
           const schedulesData = await schedulesSettled.value.json();
           if (Array.isArray(schedulesData)) {
+            const deletedSchedIds = new Set<string>();
+            try {
+              const savedDel = localStorage.getItem('ipgkpt_deleted_schedules');
+              if (savedDel) {
+                const parsedDel = JSON.parse(savedDel);
+                if (Array.isArray(parsedDel)) {
+                  parsedDel.forEach((id: string) => deletedSchedIds.add(id));
+                }
+              }
+            } catch {}
+
             let localSchedules: MonitoringSchedule[] = [];
             try {
               const saved = localStorage.getItem('ipgkpt_schedules');
               if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) localSchedules = parsed;
+                if (Array.isArray(parsed)) {
+                  localSchedules = parsed.filter(s => s && s.id && !deletedSchedIds.has(s.id));
+                }
               }
             } catch {}
 
             const schedMap = new Map<string, MonitoringSchedule>();
-            schedulesData.forEach(s => { if (s && s.id) schedMap.set(s.id, s); });
+            schedulesData.forEach(s => { 
+              if (s && s.id && !deletedSchedIds.has(s.id)) schedMap.set(s.id, s); 
+            });
 
             let hasNewerLocal = false;
             localSchedules.forEach(loc => {
-              if (!loc || !loc.id) return;
+              if (!loc || !loc.id || deletedSchedIds.has(loc.id)) return;
               const existing = schedMap.get(loc.id);
               if (!existing) {
                 schedMap.set(loc.id, loc);
@@ -593,10 +608,11 @@ const App: React.FC = () => {
   
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    type: 'record' | 'multiple_records' | 'lecturer' | 'multiple_lecturers' | 'schedule' | 'restore' | null;
+    type: 'record' | 'multiple_records' | 'lecturer' | 'multiple_lecturers' | 'schedule' | 'multiple_schedules' | 'restore' | null;
     targetId: string | null;
     targetRecordIds?: string[];
     targetLecturers?: { name: string; department: string }[];
+    targetScheduleIds?: string[];
     title: string;
     message: string;
     confirmText?: string;
@@ -606,6 +622,7 @@ const App: React.FC = () => {
     targetId: null,
     targetRecordIds: undefined,
     targetLecturers: undefined,
+    targetScheduleIds: undefined,
     title: '',
     message: '',
     confirmText: ''
@@ -1039,12 +1056,30 @@ const App: React.FC = () => {
   };
 
   const openDeleteScheduleConfirm = (id: string) => {
+    const sched = schedules.find(s => s.id === id);
     setConfirmModal({
       isOpen: true,
       type: 'schedule',
       targetId: id,
-      title: 'Padam Jadual?',
-      message: `Tindakan ini akan memadam pendaftaran jadual pemantauan ini.`
+      title: 'Padam Jadual Pemantauan?',
+      message: `Adakah anda pasti mahu memadam jadual pemantauan bagi ${sched?.lecturerName || 'pensyarah ini'} (${sched?.course || 'sesi pemantauan'})? Tindakan ini boleh dilakukan oleh semua pensyarah dan Ketua Jabatan jika berlaku sebarang kesilapan.`,
+      confirmText: 'Ya, Padam Jadual'
+    });
+  };
+
+  const openDeleteMultipleSchedulesConfirm = (scheduleIds: string[]) => {
+    if (!scheduleIds || scheduleIds.length === 0) return;
+    const matchingScheds = schedules.filter(s => scheduleIds.includes(s.id));
+    const names = Array.from(new Set(matchingScheds.map(s => s.lecturerName)));
+    const namesPreview = names.slice(0, 3).join(', ') + (names.length > 3 ? ` dan ${names.length - 3} lagi` : '');
+    setConfirmModal({
+      isOpen: true,
+      type: 'multiple_schedules',
+      targetId: null,
+      targetScheduleIds: scheduleIds,
+      title: `Padam ${scheduleIds.length} Jadual Pemantauan?`,
+      message: `Adakah anda pasti mahu memadam ${scheduleIds.length} jadual pemantauan yang dipilih (${namesPreview}) secara kekal? Tindakan ini boleh dilakukan oleh semua pensyarah dan Ketua Jabatan jika berlaku sebarang kesilapan.`,
+      confirmText: `Ya, Padam (${scheduleIds.length}) Jadual`
     });
   };
 
@@ -1248,6 +1283,17 @@ const App: React.FC = () => {
       showNotification(`${targets.length} orang pensyarah berjaya dipadam daripada data.`, 'success');
     } else if (confirmModal.type === 'schedule' && confirmModal.targetId) {
       const scheduleIdToDelete = confirmModal.targetId;
+      const targetSchedule = schedules.find(s => s.id === scheduleIdToDelete);
+
+      // Track deleted schedule ID in localStorage so it is never re-seeded
+      try {
+        const existingDeleted: string[] = JSON.parse(localStorage.getItem('ipgkpt_deleted_schedules') || '[]');
+        if (!existingDeleted.includes(scheduleIdToDelete)) {
+          existingDeleted.push(scheduleIdToDelete);
+          localStorage.setItem('ipgkpt_deleted_schedules', JSON.stringify(existingDeleted));
+        }
+      } catch {}
+
       fetch('/api/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1260,7 +1306,32 @@ const App: React.FC = () => {
       try {
         localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
       } catch {}
-      showNotification('Jadual pemantauan berjaya dipadam.', 'success');
+      showNotification(`Jadual pemantauan bagi ${targetSchedule?.lecturerName || 'pensyarah'} berjaya dipadam.`, 'success');
+    } else if (confirmModal.type === 'multiple_schedules' && confirmModal.targetScheduleIds) {
+      const idsToDelete = new Set(confirmModal.targetScheduleIds);
+
+      // Track deleted schedule IDs in localStorage so they are never re-seeded
+      try {
+        const existingDeleted: string[] = JSON.parse(localStorage.getItem('ipgkpt_deleted_schedules') || '[]');
+        confirmModal.targetScheduleIds.forEach(id => {
+          if (!existingDeleted.includes(id)) existingDeleted.push(id);
+        });
+        localStorage.setItem('ipgkpt_deleted_schedules', JSON.stringify(existingDeleted));
+      } catch {}
+
+      fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_schedules', ids: confirmModal.targetScheduleIds })
+      }).catch(console.warn);
+
+      updatedSchedules = schedules.filter((s: MonitoringSchedule) => !idsToDelete.has(s.id));
+      setSchedules(updatedSchedules);
+      setIsLocalUpdate(prev => ({ ...prev, schedules: true }));
+      try {
+        localStorage.setItem('ipgkpt_schedules', JSON.stringify(updatedSchedules));
+      } catch {}
+      showNotification(`${confirmModal.targetScheduleIds.length} jadual pemantauan berjaya dipadam secara kekal.`, 'success');
     }
 
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -1424,6 +1495,7 @@ const App: React.FC = () => {
             onDeleteLecturer={openDeleteLecturerConfirm}
             onDeleteMultipleLecturers={openDeleteMultipleLecturersConfirm}
             onDeleteSchedule={openDeleteScheduleConfirm}
+            onDeleteMultipleSchedules={openDeleteMultipleSchedulesConfirm}
             onEditRecord={handleEditRecord}
             onStartEvaluation={handleStartEvaluation}
             onAddSchedule={handleAddSchedule}

@@ -75,6 +75,7 @@ interface Props {
   onDeleteLecturer: (name: string, department: string) => void;
   onDeleteMultipleLecturers?: (lecturers: { name: string; department: string }[]) => void;
   onDeleteSchedule: (id: string) => void;
+  onDeleteMultipleSchedules?: (ids: string[]) => void;
   onEditRecord: (record: EvaluationRecord) => void;
   onAddSchedule: (schedule: MonitoringSchedule) => void;
   onUpdateSchedule: (schedule: MonitoringSchedule) => void;
@@ -114,6 +115,7 @@ export const Dashboard: React.FC<Props> = ({
   onDeleteLecturer,
   onDeleteMultipleLecturers,
   onDeleteSchedule,
+  onDeleteMultipleSchedules,
   onEditRecord,
   onAddSchedule,
   onUpdateSchedule,
@@ -304,6 +306,44 @@ export const Dashboard: React.FC<Props> = ({
       onEditRecord(target);
       setSelectedRecordIds(new Set());
     }
+  };
+
+  // Checkbox selection state for schedules (schedule ID)
+  const [scheduleSearchTerm, setScheduleSearchTerm] = useState('');
+  const [selectedScheduleIds, setSelectedScheduleIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectSchedule = (id: string) => {
+    setSelectedScheduleIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllSchedules = (displayedSchedules: MonitoringSchedule[]) => {
+    const visibleIds = displayedSchedules.map(s => s.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedScheduleIds.has(id));
+    setSelectedScheduleIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach(id => next.delete(id));
+      } else {
+        visibleIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleBatchDeleteSchedules = () => {
+    if (selectedScheduleIds.size === 0) return;
+    const ids = Array.from(selectedScheduleIds);
+    if (onDeleteMultipleSchedules) {
+      onDeleteMultipleSchedules(ids);
+    } else {
+      ids.forEach(id => onDeleteSchedule(id));
+    }
+    setSelectedScheduleIds(new Set());
   };
 
   // Lecturers, Records, and Schedules strictly scoped when viewing a department
@@ -602,8 +642,19 @@ export const Dashboard: React.FC<Props> = ({
     return baseList
       .filter(s => filterDept === 'all' || s.department === filterDept)
       .filter(s => !onlyKJSchedule || s.lecturerName.includes('(KJ)'))
+      .filter(s => {
+        if (!scheduleSearchTerm) return true;
+        const q = scheduleSearchTerm.toLowerCase();
+        return (
+          s.lecturerName.toLowerCase().includes(q) ||
+          s.course.toLowerCase().includes(q) ||
+          s.code.toLowerCase().includes(q) ||
+          (s.location && s.location.toLowerCase().includes(q)) ||
+          s.department.toLowerCase().includes(q)
+        );
+      })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [schedules, currentDeptSchedules, scheduleDeptFilter, onlyKJSchedule, isDeptView, currentDept]);
+  }, [schedules, currentDeptSchedules, scheduleDeptFilter, onlyKJSchedule, scheduleSearchTerm, isDeptView, currentDept]);
 
   const upcomingSchedules = useMemo(() => {
     const baseList = isDeptView ? currentDeptSchedules : schedules;
@@ -2372,18 +2423,37 @@ export const Dashboard: React.FC<Props> = ({
       {effectiveTab === 'schedule' && (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
           <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                   <CalendarDaysIcon className="h-6 w-6 text-indigo-600" /> 
                   Pendaftaran & Jadual Pemantauan {isDeptView ? `(${currentDept})` : ''}
                 </h3>
                 <p className="text-xs text-slate-400 font-bold mt-1 uppercase">
-                  {isDeptView ? `Senarai sesi pemantauan bagi pensyarah ${currentDept} sahaja` : 'Senarai sesi pemantauan akan datang'}
+                  {isDeptView ? `Senarai sesi pemantauan bagi pensyarah ${currentDept} sahaja` : 'Senarai sesi pemantauan bagi semua pensyarah'} • {filteredSchedules.length} Sesi
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <div className="relative flex-1 sm:w-60">
+                  <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Cari jadual pensyarah..." 
+                    value={scheduleSearchTerm} 
+                    onChange={e => setScheduleSearchTerm(e.target.value)} 
+                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none w-full focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={filteredSchedules.length > 0 && filteredSchedules.every(s => selectedScheduleIds.has(s.id))} 
+                    onChange={() => toggleSelectAllSchedules(filteredSchedules)} 
+                    className="h-4 w-4 text-rose-600 border-slate-300 rounded cursor-pointer" 
+                  />
+                  <span className="text-[10px] font-black uppercase text-slate-700">Pilih Semua ({filteredSchedules.length})</span>
+                </label>
+                <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all select-none">
                   <input type="checkbox" checked={onlyKJSchedule} onChange={e => setOnlyKJSchedule(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
                   <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
                 </label>
@@ -2393,18 +2463,45 @@ export const Dashboard: React.FC<Props> = ({
                     <select 
                       value={scheduleDeptFilter} 
                       onChange={e => setScheduleDeptFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none w-full sm:w-48 appearance-none"
+                      className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none w-full sm:w-44 appearance-none"
                     >
                       <option value="all">Semua Jabatan</option>
                       {activeDepartments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
                     </select>
                   </div>
                 )}
-                <button onClick={() => handleNewSchedule()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-indigo-700 transition-all">
+                <button onClick={() => handleNewSchedule()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-indigo-700 transition-all active:scale-95">
                   + Daftar Jadual Baru {isDeptView ? `(${currentDept})` : ''}
                 </button>
               </div>
             </div>
+
+            {/* Batch delete bar for selected schedules */}
+            {selectedScheduleIds.size > 0 && (
+              <div className="mb-6 p-4 bg-rose-50/90 border-2 border-rose-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2 text-rose-800 font-bold text-xs sm:text-sm">
+                  <CheckCircleIcon className="h-5 w-5 text-rose-600 shrink-0" />
+                  <span>{selectedScheduleIds.size} jadual pemantauan dipilih untuk tindakan</span>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={handleBatchDeleteSchedules}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95"
+                    title="Padam semua jadual pemantauan yang dipilih untuk pensyarah"
+                  >
+                    <TrashIcon className="h-4 w-4" /> Padam Jadual Dipilih ({selectedScheduleIds.size})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedScheduleIds(new Set())}
+                    className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-bold transition-all"
+                  >
+                    Batal Pilihan
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {filteredSchedules.length > 0 ? filteredSchedules.map(s => {
@@ -2412,43 +2509,60 @@ export const Dashboard: React.FC<Props> = ({
                   r.lecturerName.trim().toLowerCase() === s.lecturerName.trim().toLowerCase() && 
                   (r.date === s.date || r.code === s.code)
                 );
+                const isSelected = selectedScheduleIds.has(s.id);
                 return (
-                  <div key={s.id} className="p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:border-indigo-200 transition-all group relative">
+                  <div key={s.id} className={`p-6 bg-slate-50 border rounded-3xl transition-all relative ${isSelected ? 'border-rose-400 bg-rose-50/20 shadow-sm' : 'border-slate-200 hover:border-indigo-300'}`}>
                     <div className="flex justify-between items-start mb-4">
-                      <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
-                        <ClockIcon className="h-5 w-5" />
+                      <div className="flex items-center gap-2.5">
+                        <label className="p-1 cursor-pointer flex items-center" title="Pilih jadual ini untuk dipadam">
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected} 
+                            onChange={() => toggleSelectSchedule(s.id)} 
+                            className="h-4 w-4 text-rose-600 border-slate-300 rounded cursor-pointer" 
+                          />
+                        </label>
+                        <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
+                          <ClockIcon className="h-5 w-5" />
+                        </div>
                       </div>
                       
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEditSchedule(s)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-lg shadow-sm" title="Kemaskini Jadual">
+                      {/* Prominent, always-visible action buttons for all users */}
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={() => handleEditSchedule(s)} 
+                          className="p-2 bg-white hover:bg-indigo-50 border border-slate-200 text-slate-600 hover:text-indigo-600 rounded-xl shadow-xs transition-all" 
+                          title="Kemaskini Jadual Pemantauan Ini"
+                        >
                           <PencilSquareIcon className="h-4 w-4" />
                         </button>
-                        <button onClick={() => onDeleteSchedule(s.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm" title="Padam Jadual">
+                        <button 
+                          onClick={() => onDeleteSchedule(s.id)} 
+                          className="p-2 bg-white hover:bg-rose-50 border border-slate-200 text-rose-600 hover:border-rose-300 rounded-xl shadow-xs transition-all active:scale-95" 
+                          title="Padam Jadual Pemantauan Pensyarah Ini"
+                        >
                           <TrashIcon className="h-4 w-4" />
                         </button>
-                        {matchingRecord && (
-                          <button 
-                            onClick={() => onDeleteRecord(matchingRecord.id)} 
-                            className="p-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg shadow-sm" 
-                            title="Padam Rekod Penilaian Pensyarah/KJ Ini"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        )}
                       </div>
                     </div>
+
                     <div className="space-y-1 mb-4">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-black text-slate-800 leading-tight">{s.lecturerName}</p>
                         {s.lecturerName.includes('(KJ)') && <span className="bg-rose-50 text-rose-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-100">KJ</span>}
-                        {matchingRecord && (
+                        {matchingRecord ? (
                           <span className="bg-emerald-50 text-emerald-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-emerald-200">
                             ✓ Selesai Dinilai
+                          </span>
+                        ) : (
+                          <span className="bg-amber-50 text-amber-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-amber-200">
+                            Menunggu Pemantauan
                           </span>
                         )}
                       </div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{s.department}</p>
                     </div>
+
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
                         <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" />
@@ -2462,42 +2576,60 @@ export const Dashboard: React.FC<Props> = ({
                       </div>
                       <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl w-fit">
                         <MapPinIcon className="h-3.5 w-3.5" />
-                        <span>{s.location}</span>
+                        <span>{s.location || 'Bilik Kuliah / Makmal'}</span>
                       </div>
                     </div>
+
+                    {/* Bottom Action Buttons: Always provide clear Padam Jadual button */}
                     {matchingRecord ? (
-                      <div className="mt-4 flex gap-2">
+                      <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-slate-200/60">
                         <button 
                           onClick={() => onEditRecord(matchingRecord)} 
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
+                          className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
                           title="Kemaskini Rekod Penilaian Ini"
                         >
-                          <PencilSquareIcon className="h-3.5 w-3.5" /> Kemaskini
+                          <PencilSquareIcon className="h-3.5 w-3.5" /> Kemaskini Rekod
                         </button>
                         <button 
                           onClick={() => onDeleteRecord(matchingRecord.id)} 
                           className="flex items-center justify-center gap-1 px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
-                          title="Padam Rekod Penilaian Ini"
+                          title="Padam Rekod Penilaian Pensyarah Ini"
                         >
                           <TrashIcon className="h-3.5 w-3.5" /> Padam Rekod
                         </button>
+                        <button 
+                          onClick={() => onDeleteSchedule(s.id)} 
+                          className="flex items-center justify-center gap-1 px-3 py-2 bg-white hover:bg-rose-50 border border-slate-200 text-rose-600 hover:border-rose-200 rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95"
+                          title="Padam Jadual Pemantauan Pensyarah Ini"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" /> Padam Jadual
+                        </button>
                       </div>
                     ) : (
-                      onStartEvaluation && (
+                      <div className="mt-4 flex gap-2 pt-2 border-t border-slate-200/60">
+                        {onStartEvaluation && (
+                          <button 
+                            onClick={() => onStartEvaluation({ 
+                              lecturerName: s.lecturerName, 
+                              department: s.department, 
+                              course: s.course, 
+                              code: s.code, 
+                              date: s.date 
+                            })}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95"
+                            title={`Mula Menilai ${s.lecturerName} untuk kursus ${s.code}`}
+                          >
+                            <ClipboardDocumentCheckIcon className="h-4 w-4" /> Nilai Sesi Ini Sekarang
+                          </button>
+                        )}
                         <button 
-                          onClick={() => onStartEvaluation({ 
-                            lecturerName: s.lecturerName, 
-                            department: s.department, 
-                            course: s.course, 
-                            code: s.code, 
-                            date: s.date 
-                          })}
-                          className="w-full mt-4 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100 transition-all active:scale-95"
-                          title={`Mula Menilai ${s.lecturerName} untuk kursus ${s.code}`}
+                          onClick={() => onDeleteSchedule(s.id)} 
+                          className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl text-xs font-black shadow-xs transition-all active:scale-95"
+                          title="Padam Jadual Pemantauan Pensyarah Ini"
                         >
-                          <ClipboardDocumentCheckIcon className="h-4 w-4" /> Nilai Sesi Ini Sekarang
+                          <TrashIcon className="h-4 w-4" /> Padam Jadual
                         </button>
-                      )
+                      </div>
                     )}
                   </div>
                 );
@@ -3122,14 +3254,24 @@ export const Dashboard: React.FC<Props> = ({
                         {/* Jadual Pemantauan TP */}
                         <td className="px-4 py-4 text-center">
                           {kj.schedule ? (
-                            <div className="inline-block p-1.5 bg-indigo-50 border border-indigo-100 rounded-xl text-left">
-                              <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-900">
-                                <CalendarDaysIcon className="h-3.5 w-3.5 text-indigo-600" />
-                                {formatDate(kj.schedule.date)}
+                            <div className="inline-flex items-center gap-2 p-1.5 bg-indigo-50 border border-indigo-100 rounded-xl text-left">
+                              <div>
+                                <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-900">
+                                  <CalendarDaysIcon className="h-3.5 w-3.5 text-indigo-600" />
+                                  {formatDate(kj.schedule.date)}
+                                </div>
+                                <div className="text-[10px] text-indigo-700 font-medium">
+                                  {kj.schedule.time} • {kj.schedule.location || 'Bilik Kuliah'}
+                                </div>
                               </div>
-                              <div className="text-[10px] text-indigo-700 font-medium">
-                                {kj.schedule.time} • {kj.schedule.location || 'Bilik Kuliah'}
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => onDeleteSchedule(kj.schedule!.id)}
+                                className="p-1 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-indigo-100 rounded-lg transition-colors shadow-2xs"
+                                title="Padam Jadual Pemantauan KJ Ini"
+                              >
+                                <TrashIcon className="h-3.5 w-3.5" />
+                              </button>
                             </div>
                           ) : (
                             <span className="text-xs text-slate-400">Tiada Jadual</span>
@@ -3365,13 +3507,9 @@ export const Dashboard: React.FC<Props> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (confirm(`Adakah anda pasti untuk memadam jadual ini?`)) {
-                                onDeleteSchedule(sched.id);
-                              }
-                            }}
-                            className="p-2 bg-white hover:bg-rose-50 border border-slate-200 text-rose-600 rounded-xl transition-all"
-                            title="Padam Jadual"
+                            onClick={() => onDeleteSchedule(sched.id)}
+                            className="p-2 bg-white hover:bg-rose-50 border border-slate-200 text-rose-600 rounded-xl transition-all shadow-xs active:scale-95"
+                            title="Padam Jadual Pemantauan Ketua Jabatan Ini"
                           >
                             <TrashIcon className="h-3.5 w-3.5" />
                           </button>
@@ -3527,9 +3665,25 @@ export const Dashboard: React.FC<Props> = ({
                 <input required type="text" value={schedForm.code} onChange={e => setSchedForm({...schedForm, code: e.target.value})} placeholder="Kod" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
                 <input required type="text" value={schedForm.location} onChange={e => setSchedForm({...schedForm, location: e.target.value})} placeholder="Lokasi (cth: Bilik Kuliah / Google Meet)" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
               </div>
-              <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setShowScheduleModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">Batal</button>
-                <button type="submit" className="px-8 py-2 bg-indigo-600 text-white font-black rounded-xl text-sm shadow-lg shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95">Simpan Jadual</button>
+              <div className="pt-4 flex justify-between items-center gap-3">
+                {editingScheduleId ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const idToDelete = editingScheduleId;
+                      setShowScheduleModal(false);
+                      onDeleteSchedule(idToDelete);
+                    }}
+                    className="px-4 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95"
+                    title="Padam jadual pemantauan ini"
+                  >
+                    <TrashIcon className="h-4 w-4" /> Padam Jadual
+                  </button>
+                ) : <div />}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowScheduleModal(false)} className="px-5 py-2 text-sm font-bold text-slate-500 hover:text-slate-700">Batal</button>
+                  <button type="submit" className="px-6 py-2 bg-indigo-600 text-white font-black rounded-xl text-sm shadow-lg shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95">Simpan Jadual</button>
+                </div>
               </div>
             </form>
           </div>
