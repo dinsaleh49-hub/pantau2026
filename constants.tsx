@@ -188,7 +188,7 @@ export const EVALUATORS = [
  'Rabi ah binti Abd. Rahman',	
  'Ramli bin Setapa',	
  'Ruba ie bin Said',		
- 'Sh. Nabilatul Huda binti Syed Abdullah',	
+ 'Sh Nabilatul Huda Syed Abdullah',	
  'Shamsharizal bin Abd Aziz (KJ)',
  'Tan Sok Phiaw',		
  'Ts. Dr. Mohamed Nazul bin Ismail (KJ)',

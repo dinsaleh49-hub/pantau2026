@@ -316,15 +316,49 @@ const App: React.FC = () => {
               deletedIds = new Set<string>(JSON.parse(localStorage.getItem('ipgkpt_deleted_records') || '[]'));
             } catch {}
 
-            // Server is single source of truth across all devices
+            // Server records
             const cleanedServer = recordsData.filter((r: any) => 
               r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09'
             );
             
-            setRecords(cleanedServer);
+            // Read local records to preserve newly filled or updated evaluation forms
+            let localRecords: EvaluationRecord[] = [];
             try {
-              localStorage.setItem('ipgkpt_records', JSON.stringify(cleanedServer));
+              const saved = localStorage.getItem('ipgkpt_records');
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                  localRecords = parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+                }
+              }
             } catch {}
+
+            const recMap = new Map<string, EvaluationRecord>();
+            cleanedServer.forEach(r => { if (r && r.id && !deletedIds.has(r.id)) recMap.set(r.id, r); });
+
+            let hasNewerLocal = false;
+            localRecords.forEach(loc => {
+              if (!loc || !loc.id || deletedIds.has(loc.id)) return;
+              const existing = recMap.get(loc.id);
+              if (!existing) {
+                // Ensure filled form is KEPT permanently and not lost
+                recMap.set(loc.id, loc);
+                hasNewerLocal = true;
+              } else if ((loc.timestamp || 0) > (existing.timestamp || 0)) {
+                recMap.set(loc.id, loc);
+                hasNewerLocal = true;
+              }
+            });
+
+            const mergedRecords = Array.from(recMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            setRecords(mergedRecords);
+            try {
+              localStorage.setItem('ipgkpt_records', JSON.stringify(mergedRecords));
+            } catch {}
+
+            if (hasNewerLocal) {
+              syncRecordsToServerSafely(mergedRecords).catch(console.error);
+            }
           }
         } catch (e) {
           console.warn("Failed to parse records data:", e);
@@ -336,10 +370,47 @@ const App: React.FC = () => {
         try {
           const schedulesData = await schedulesSettled.value.json();
           if (Array.isArray(schedulesData)) {
-            setSchedules(schedulesData);
+            let localSchedules: MonitoringSchedule[] = [];
             try {
-              localStorage.setItem('ipgkpt_schedules', JSON.stringify(schedulesData));
+              const saved = localStorage.getItem('ipgkpt_schedules');
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) localSchedules = parsed;
+              }
             } catch {}
+
+            const schedMap = new Map<string, MonitoringSchedule>();
+            schedulesData.forEach(s => { if (s && s.id) schedMap.set(s.id, s); });
+
+            let hasNewerLocal = false;
+            localSchedules.forEach(loc => {
+              if (!loc || !loc.id) return;
+              const existing = schedMap.get(loc.id);
+              if (!existing) {
+                schedMap.set(loc.id, loc);
+                hasNewerLocal = true;
+              } else if (loc.status === 'Completed' && existing.status !== 'Completed') {
+                schedMap.set(loc.id, loc);
+                hasNewerLocal = true;
+              } else if ((loc.timestamp || 0) > (existing.timestamp || 0)) {
+                schedMap.set(loc.id, loc);
+                hasNewerLocal = true;
+              }
+            });
+
+            const mergedSchedules = Array.from(schedMap.values());
+            setSchedules(mergedSchedules);
+            try {
+              localStorage.setItem('ipgkpt_schedules', JSON.stringify(mergedSchedules));
+            } catch {}
+
+            if (hasNewerLocal) {
+              fetch('/api/schedules', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(mergedSchedules)
+              }).catch(console.error);
+            }
           }
         } catch (e) {
           console.warn("Failed to parse schedules data:", e);
@@ -619,11 +690,20 @@ const App: React.FC = () => {
     setIsLocalUpdate(prev => ({ ...prev, records: true }));
     
     const trimmedName = record.lecturerName.trim();
+    // Ensure this record ID is removed from any previous deletedIds list so it is always preserved
+    try {
+      const existingDeleted: string[] = JSON.parse(localStorage.getItem('ipgkpt_deleted_records') || '[]');
+      if (existingDeleted.includes(record.id)) {
+        const filtered = existingDeleted.filter(id => id !== record.id);
+        localStorage.setItem('ipgkpt_deleted_records', JSON.stringify(filtered));
+      }
+    } catch {}
+
     const isEdit = records.some(r => r.id === record.id);
     const normalizedRecord: EvaluationRecord = { 
       ...record, 
       lecturerName: trimmedName,
-      timestamp: isEdit ? Date.now() : (record.timestamp || Date.now())
+      timestamp: Date.now() // Always assign latest timestamp to guarantee persistence
     };
     
     // Save both signatures to persistent library
@@ -1193,10 +1273,8 @@ const App: React.FC = () => {
   // Full dashboard access for all lecturers and ketua jabatan
   const isRestrictedUser = false;
 
-  // Department users access their department data; admin and universal access all data
-  const accessibleRecords = (user?.role === 'admin' || user?.department === 'SEMUA')
-    ? records 
-    : records.filter(r => r.department === user?.department);
+  // Full records access for all lecturers and ketua jabatan so all filled evaluation forms remain in the system
+  const accessibleRecords = records;
 
   const accessibleLecturers = (user?.role === 'admin' || user?.department === 'SEMUA')
     ? lecturersList 

@@ -72,45 +72,53 @@ export const EvaluationForm: React.FC<Props> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [restoredFromDraft, setRestoredFromDraft] = useState(false);
 
-  // Restore draft if opening blank form and draft exists
+  // Restore draft if opening form and draft exists
   useEffect(() => {
-    if (!initialData) {
-      try {
-        const savedDraft = localStorage.getItem('epantau_draft_active_form');
-        if (savedDraft) {
-          const parsed = JSON.parse(savedDraft);
-          if (parsed && (parsed.formData?.lecturerName || Object.keys(parsed.scores || {}).length > 0)) {
-            if (parsed.formData) setFormData(prev => ({ ...prev, ...parsed.formData }));
-            if (parsed.scores) setScores(parsed.scores);
-            if (parsed.itemRemarks) setItemRemarks(parsed.itemRemarks);
-            setRestoredFromDraft(true);
-          }
+    try {
+      const draftKey = initialData?.id ? `epantau_draft_${initialData.id}` : 'epantau_draft_active_form';
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed && (parsed.formData?.lecturerName || Object.keys(parsed.scores || {}).length > 0)) {
+          if (parsed.formData) setFormData(prev => ({ ...prev, ...parsed.formData }));
+          if (parsed.scores) setScores(parsed.scores);
+          if (parsed.itemRemarks) setItemRemarks(parsed.itemRemarks);
+          if (parsed.lecturerSig) setLecturerSig(parsed.lecturerSig);
+          if (parsed.evaluatorSig) setEvaluatorSig(parsed.evaluatorSig);
+          setRestoredFromDraft(true);
         }
-      } catch (e) {
-        console.warn("Could not parse draft:", e);
       }
+    } catch (e) {
+      console.warn("Could not parse draft:", e);
     }
   }, [initialData]);
 
-  // Auto-save form progress to localStorage
+  // Auto-save form progress to localStorage continuously so filled data is never lost
   useEffect(() => {
-    if (!initialData && (formData.lecturerName || Object.keys(scores).length > 0 || formData.remarks)) {
+    const hasAnyData = formData.lecturerName || Object.keys(scores).length > 0 || formData.remarks || lecturerSig || evaluatorSig;
+    if (hasAnyData) {
       try {
-        localStorage.setItem('epantau_draft_active_form', JSON.stringify({
+        const draftKey = initialData?.id ? `epantau_draft_${initialData.id}` : 'epantau_draft_active_form';
+        localStorage.setItem(draftKey, JSON.stringify({
           formData,
           scores,
           itemRemarks,
+          lecturerSig,
+          evaluatorSig,
           savedAt: Date.now()
         }));
       } catch (e) {
         console.warn("Could not save form draft:", e);
       }
     }
-  }, [formData, scores, itemRemarks, initialData]);
+  }, [formData, scores, itemRemarks, lecturerSig, evaluatorSig, initialData]);
 
   const handleResetDraft = () => {
     try {
       localStorage.removeItem('epantau_draft_active_form');
+      if (initialData?.id) {
+        localStorage.removeItem(`epantau_draft_${initialData.id}`);
+      }
     } catch {}
     setFormData({
       campus: CAMPUSES[0],
@@ -311,9 +319,12 @@ export const EvaluationForm: React.FC<Props> = ({
     
     try {
       await onSubmit(record);
-      // Clean up auto-saved draft
+      // Clean up auto-saved drafts
       try {
         localStorage.removeItem('epantau_draft_active_form');
+        if (initialData?.id) {
+          localStorage.removeItem(`epantau_draft_${initialData.id}`);
+        }
       } catch {}
     } catch (error) {
       console.error("Error in onSubmit:", error);
