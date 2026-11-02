@@ -90,7 +90,7 @@ const App: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+          return parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7');
         }
       }
       return INITIAL_RECORDS.filter(r => !deletedIds.has(r.id));
@@ -131,14 +131,17 @@ const App: React.FC = () => {
     } catch {}
     return LECTURERS;
   });
-  // Ruangan tandatangan dikosongkan dan tandatangan terdahulu dipadamkan
-  const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>({});
-
-  useEffect(() => {
+  // Ruangan tandatangan tersimpan untuk kegunaan merentasi semua peranti
+  const [savedSignatures, setSavedSignatures] = useState<Record<string, string>>(() => {
     try {
-      localStorage.removeItem('ipgkpt_signatures');
+      const saved = localStorage.getItem('ipgkpt_signatures');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
     } catch {}
-  }, []);
+    return {};
+  });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
@@ -205,7 +208,7 @@ const App: React.FC = () => {
   }, []);
 
 
-  // Safely sync records in batches to never exceed serverless 4.5MB payload limit (Vercel 413 prevention)
+  // Safely sync records in atomic requests up to 3.5MB (Vercel limit 4.5MB, local Express 50MB)
   const syncRecordsToServerSafely = useCallback(async (recordsToSync: EvaluationRecord[]) => {
     if (!Array.isArray(recordsToSync)) {
       return { success: false, count: 0 };
@@ -225,8 +228,8 @@ const App: React.FC = () => {
     }
 
     const payloadStr = JSON.stringify(recordsToSync);
-    // If under 300KB and small record count, send directly
-    if (payloadStr.length < 300000 && recordsToSync.length <= 15) {
+    // Send in single atomic request for payloads under 3.5MB (fast, reliable, and consistent)
+    if (payloadStr.length < 3.5 * 1024 * 1024) {
       const res = await fetch('/api/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -239,8 +242,8 @@ const App: React.FC = () => {
       return res.json();
     }
 
-    // Otherwise chunk into batches of 15 records (< 250KB per request)
-    const CHUNK_SIZE = 15;
+    // Fallback chunking only for massive payloads > 3.5MB
+    const CHUNK_SIZE = 25;
     const chunks: EvaluationRecord[][] = [];
     for (let i = 0; i < recordsToSync.length; i += CHUNK_SIZE) {
       chunks.push(recordsToSync.slice(i, i + CHUNK_SIZE));
@@ -276,8 +279,6 @@ const App: React.FC = () => {
   }, []);
 
   const fetchData = useCallback(async (isSilent = false) => {
-    const isAnyLocalUpdate = isLocalUpdate.records || isLocalUpdate.schedules || isLocalUpdate.lecturers;
-    if (isAnyLocalUpdate && isSilent) return; // Don't poll if we have unsynced local changes
     if (!isSilent) setIsSyncing(true);
     try {
       const results = await Promise.allSettled([
@@ -347,7 +348,7 @@ const App: React.FC = () => {
 
             // Server records
             const cleanedServer = recordsData.filter((r: any) => 
-              r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09'
+              r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7'
             );
             
             // Read local records to preserve newly filled or updated evaluation forms
@@ -357,7 +358,7 @@ const App: React.FC = () => {
               if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed)) {
-                  localRecords = parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7' && r.date !== '2026-10-09');
+                  localRecords = parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7');
                 }
               }
             } catch {}
@@ -510,18 +511,18 @@ const App: React.FC = () => {
       setIsSyncing(false);
       setLastSync(new Date());
     }
-  }, [isLocalUpdate]);
+  }, [syncRecordsToServerSafely]);
   
   // Initial data fetch and polling
   useEffect(() => {
     fetchData();
 
-    // Fast polling every 5 seconds when tab is active for near instant sync across devices
+    // Fast polling every 4 seconds when tab is active for near instant sync across devices
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && !document.hidden) {
         fetchData(true);
       }
-    }, 5000);
+    }, 4000);
 
     const handleFocus = () => {
       fetchData(true);
@@ -704,11 +705,11 @@ const App: React.FC = () => {
       await Promise.all(tasks);
 
       console.log("[Sync] Sync successful.");
-      setIsLocalUpdate(prev => ({
-        records: doRecords ? false : prev.records,
-        schedules: doSchedules ? false : prev.schedules,
-        lecturers: doLecturers ? false : prev.lecturers
-      }));
+      setIsLocalUpdate({
+        records: false,
+        schedules: false,
+        lecturers: false
+      });
       setSyncError(null);
       setLastSync(new Date());
       return true;
@@ -774,7 +775,7 @@ const App: React.FC = () => {
       const isLecturerMatch = s.lecturerName.trim().toLowerCase() === trimmedName.toLowerCase();
       if (!isLecturerMatch) return s;
       matchedSchedule = true;
-      return { ...s, status: 'Completed' as const, date: normalizedRecord.date || s.date };
+      return { ...s, status: 'Completed' as const, date: normalizedRecord.date || s.date, timestamp: Date.now() };
     });
 
     if (!matchedSchedule && trimmedName) {
@@ -1462,13 +1463,23 @@ const App: React.FC = () => {
                 <span className="text-xs font-bold text-slate-600">{user.username}</span>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchData(false)}
+                  disabled={isSyncing}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full text-[10px] font-bold text-slate-600 transition-all active:scale-95 disabled:opacity-50"
+                  title="Klik untuk menyegerakkan data serta-merta dengan semua peranti"
+                >
+                  <ArrowPathIcon className={`h-3 w-3 ${isSyncing ? 'animate-spin text-indigo-600' : 'text-slate-500'}`} />
+                  <span className="hidden sm:inline">{isSyncing ? 'Menyelaraskan...' : 'Segerak'}</span>
+                </button>
                 <div className={`w-2 h-2 rounded-full ${syncError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  {syncError ? 'Ralat Penyelarasan' : 'Sistem Dalam Talian'}
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden sm:inline">
+                  {syncError ? 'Ralat Penyelarasan' : 'Semua Peranti Selaras'}
                 </span>
                 {lastSync && (
-                  <span className="text-[9px] text-slate-400">
-                    • Terakhir: {lastSync.toLocaleTimeString()}
+                  <span className="text-[9px] text-slate-400 hidden lg:inline">
+                    • {lastSync.toLocaleTimeString()}
                   </span>
                 )}
               </div>
