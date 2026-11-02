@@ -129,7 +129,7 @@ export const LECTURERS = [
 { name: 'Roziah binti Anuar',	department:	'Jabatan Sains' },
 { name: 'Ruba ie bin Said',	department:	'Jabatan Pendidikan Teknik dan Vokasional' },
 { name: 'Sarimah binti Mokhtar',	department:	'Jabatan Pendidikan Islam' },
-{ name: 'Sh. Nabilatul Huda binti Syed Abdullah',	department: 'Jabatan Pendidikan Islam' },
+{ name: 'Sh Nabilatul Huda Syed Abdullah',	department: 'Jabatan Pendidikan Islam' },
 { name: 'Shaharudin bin Saad',	department:	'Jabatan Pendidikan Teknik dan Vokasional' },
 { name: 'Shamsharizal bin Abd Aziz (KJ)',	department:	'Jabatan Pendidikan Jasmani dan Kokurikulum' },
 { name: 'Sharon Vijaya a/p Balakrishnan',	department: 'Jabatan Bahasa' },
