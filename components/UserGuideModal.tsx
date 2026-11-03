@@ -7,7 +7,8 @@ import {
   PencilSquareIcon, 
   SparklesIcon, 
   CloudArrowUpIcon, 
-  PrinterIcon 
+  PrinterIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 interface Props {
@@ -42,7 +43,7 @@ export const UserGuideModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <CheckBadgeIcon className="h-5 w-5" /> 1. Pengenalan
             </h4>
             <p className="text-sm text-slate-600 leading-relaxed">
-              PINTAR-Dash adalah sistem digital untuk IPGKPT bagi menguruskan pemantauan kurikulum (LAM-PT-03-04). Sistem ini menyokong analisis AI, penjanaan laporan PDF, dan integrasi Google Drive.
+              PINTAR-Dash adalah sistem digital untuk IPGKPT bagi menguruskan pemantauan kurikulum (LAM-PT-03-04). Sistem ini menyokong analisis AI, penjanaan laporan PDF, dan integrasi Google Drive serta penyelarasan penuh merentasi semua peranti (Laptop, Android, Mac & Windows).
             </p>
           </section>
 
@@ -61,11 +62,11 @@ export const UserGuideModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </div>
               <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100">
                 <p className="text-xs font-bold text-purple-900 mb-1">Timbalan Pengarah (TP)</p>
-                <p className="text-[11px] text-purple-700">Akses portal khas pemantauan Ketua Jabatan (login: <strong>tp</strong>, password: <strong>tp</strong>).</p>
+                <p className="text-[11px] text-purple-700">Akses portal khas pemantauan Ketua Jabatan untuk Timbalan Pengarah.</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <p className="text-xs font-bold text-slate-800 mb-1">Pensyarah</p>
-                <p className="text-[11px] text-slate-500">Akses pendaftaran jadual dan status pemantauan kendiri (login: <strong>pensyarah</strong>).</p>
+                <p className="text-[11px] text-slate-500">Akses pendaftaran jadual dan status pemantauan kendiri.</p>
               </div>
             </div>
           </section>
@@ -120,6 +121,23 @@ export const UserGuideModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   <p className="text-[11px] text-slate-500">Jana laporan individu, ringkasan jabatan, atau arkib penuh dalam format PDF yang profesional.</p>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <section>
+            <h4 className="text-sm font-black text-indigo-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <ArrowPathIcon className="h-5 w-5" /> 5. Penyelarasan Merentasi Semua Peranti (Multi-Device Sync)
+            </h4>
+            <div className="space-y-3 text-sm text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <p>
+                Data yang diisi, dikemaskini, atau dipadam diselaraskan secara automatik ke semua peranti pengguna:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>Laptop & Desktop (Windows, Mac, Linux):</strong> Akses penuh di pelayar pilihan anda.</li>
+                <li><strong>Telefon Pintar & Tablet (Android & iOS):</strong> Mudah diakses di dalam kelas atau dewan kuliah.</li>
+                <li><strong>Butang "Segerak Semua Peranti":</strong> Klik bila-bila masa untuk memastikan peranti anda segera menerima data terkini dari peranti lain.</li>
+                <li><strong>Perlindungan Luar Talian (Offline-Safe):</strong> Sekiranya sambungan terputus, data disimpan setempat dalam peranti dan disegerakkan semula secara automatik bila tersambung.</li>
+              </ul>
             </div>
           </section>
         </div>

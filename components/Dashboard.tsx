@@ -56,7 +56,9 @@ import {
   CheckCircleIcon,
   UserCircleIcon,
   LockClosedIcon,
-  KeyIcon
+  KeyIcon,
+  ComputerDesktopIcon,
+  DevicePhoneMobileIcon
 } from '@heroicons/react/24/outline';
 import { generatePDF, generateSummaryPDF, generateFullDepartmentPDF } from '../services/pdfService';
 import { uploadToGoogleDrive } from '../services/googleDriveService';
@@ -82,6 +84,9 @@ interface Props {
   onAddLecturer: (lecturer: { name: string; department: string }) => void;
   onUpdateLecturer: (oldName: string, oldDept: string, updatedLecturer: { name: string; department: string }) => void;
   onRefresh?: () => void;
+  onSync?: () => void;
+  isSyncing?: boolean;
+  syncError?: string | null;
   lastSync?: Date | null;
   userDept?: string;
   isRestrictedUser?: boolean;
@@ -122,6 +127,9 @@ export const Dashboard: React.FC<Props> = ({
   onAddLecturer,
   onUpdateLecturer,
   onRefresh,
+  onSync,
+  isSyncing = false,
+  syncError,
   lastSync,
   isRestrictedUser,
   onStartEvaluation
@@ -200,6 +208,7 @@ export const Dashboard: React.FC<Props> = ({
   const [showAIModal, setShowAIModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
   const [showLecturerModal, setShowLecturerModal] = useState(false);
   const [isOtherDept, setIsOtherDept] = useState(false);
   const [editingLecturer, setEditingLecturer] = useState<{ name: string; department: string } | null>(null);
@@ -1005,18 +1014,46 @@ export const Dashboard: React.FC<Props> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">PINTAR-Dash</h2>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex flex-wrap items-center gap-2 mt-1">
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
               {isDeptView ? `Paparan Jabatan: ${currentDept}` : 'Status PINTAR-Dash'}
             </p>
-            {lastSync && (
-              <p className="text-[9px] text-slate-400 font-medium italic">
-                • Dikemaskini: {lastSync.toLocaleTimeString()}
-              </p>
-            )}
+            <span className="text-slate-300">•</span>
+            <button 
+              type="button"
+              onClick={() => setShowSyncModal(true)}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/60 px-2 py-0.5 rounded-lg transition-colors cursor-pointer group"
+              title="Klik untuk melihat status penyelarasan merentasi semua peranti (Laptop, Android, Mac & Windows)"
+            >
+              <span className={`w-2 h-2 rounded-full ${syncError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500 animate-pulse'}`} />
+              <span>Selaras: Laptop, Android, Mac & Windows</span>
+              {lastSync && (
+                <span className="text-emerald-600/80 text-[9px] font-medium">
+                  ({lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                </span>
+              )}
+              <InformationCircleIcon className="h-3 w-3 text-emerald-500 ml-0.5 opacity-60 group-hover:opacity-100" />
+            </button>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {onSync && (
+            <button 
+              type="button"
+              onClick={onSync} 
+              disabled={isSyncing}
+              className="flex items-center gap-2 px-3.5 sm:px-4 py-2 bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 active:bg-indigo-200 text-indigo-700 border border-indigo-200 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm active:scale-95 disabled:opacity-60 min-h-[40px] cursor-pointer"
+              title="Segerak data sekarang untuk selaraskan rekod ke Laptop, Telefon Pintar (Android/iOS) dan Komputer (Mac/Windows)"
+            >
+              <ArrowPathIcon className={`h-4 w-4 text-indigo-600 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Menyelaraskan...' : 'Segerak Semua Peranti'}</span>
+              <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 bg-white text-[9px] text-indigo-600 font-bold rounded border border-indigo-100 shadow-2xs">
+                <ComputerDesktopIcon className="h-3 w-3 inline text-slate-500" />
+                <DevicePhoneMobileIcon className="h-3 w-3 inline text-slate-500" />
+                Semua OS
+              </span>
+            </button>
+          )}
           {isAdminView && (
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
               <BuildingOfficeIcon className="h-4 w-4 text-indigo-600" />
@@ -2473,6 +2510,18 @@ export const Dashboard: React.FC<Props> = ({
                   <TrashIcon className="h-4 w-4 text-rose-600" />
                   <span>Padam Jadual Semua Pensyarah ({filteredSchedules.length})</span>
                 </button>
+                {onSync && (
+                  <button 
+                    type="button"
+                    onClick={onSync}
+                    disabled={isSyncing}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-black shadow-xs transition-all active:scale-95 disabled:opacity-50"
+                    title="Segerak jadual pemantauan serta-merta merentasi semua peranti (Android, iOS, Windows, Mac)"
+                  >
+                    <ArrowPathIcon className={`h-4 w-4 text-indigo-600 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span>{isSyncing ? 'Menyelaraskan...' : 'Segerak Jadual'}</span>
+                  </button>
+                )}
                 <label className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-all select-none">
                   <input type="checkbox" checked={onlyKJSchedule} onChange={e => setOnlyKJSchedule(e.target.checked)} className="h-4 w-4 text-rose-600 border-slate-300 rounded" />
                   <span className="text-[10px] font-black uppercase text-slate-600">Hanya KJ</span>
@@ -3979,6 +4028,116 @@ export const Dashboard: React.FC<Props> = ({
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}
       />
+
+      {showSyncModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowSyncModal(false)} />
+          <div className="relative bg-white rounded-3xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 shadow-2xl">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-md shadow-indigo-100">
+                  <ArrowPathIcon className={`h-6 w-6 ${isSyncing ? 'animate-spin' : ''}`} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800 tracking-tight">Penyelarasan Multi-Peranti</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Laptop, Android, Mac & Windows</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowSyncModal(false)} 
+                className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-indigo-900 uppercase tracking-wide">Status Sambungan Pelayan</span>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    syncError ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${syncError ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'}`} />
+                    {syncError ? 'Sambungan Terhad' : 'Tersambung & Aktif'}
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-700/90 leading-relaxed">
+                  Sistem menyelaraskan rekod, jadual, dan tandatangan secara automatik setiap 4 saat dan menyokong penjimatan setempat secara selamat sekiranya di luar talian.
+                </p>
+                {lastSync && (
+                  <p className="text-[10px] text-indigo-600 font-semibold pt-1 border-t border-indigo-100">
+                    Masa Terakhir Diselaraskan: {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <p className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2.5">Sokongan Merentasi Peranti</p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-start gap-2.5">
+                    <ComputerDesktopIcon className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Laptop & Komputer</p>
+                      <p className="text-[10px] text-slate-500">Windows, Mac & Linux</p>
+                      <span className="text-[9px] font-black text-emerald-600 mt-0.5 inline-block">✓ Selaras Automatik</span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-start gap-2.5">
+                    <DevicePhoneMobileIcon className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Telefon Pintar</p>
+                      <p className="text-[10px] text-slate-500">Android & iPhone (iOS)</p>
+                      <span className="text-[9px] font-black text-emerald-600 mt-0.5 inline-block">✓ Selaras Automatik</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                <div className="grid grid-cols-3 gap-2 text-center divide-x divide-slate-200">
+                  <div>
+                    <p className="text-base font-black text-slate-800">{records.length}</p>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase">Rekod Penilaian</p>
+                  </div>
+                  <div>
+                    <p className="text-base font-black text-slate-800">{schedules.length}</p>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase">Jadual Sesi</p>
+                  </div>
+                  <div>
+                    <p className="text-base font-black text-slate-800">{allLecturers.length}</p>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase">Pensyarah</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowSyncModal(false)}
+                  className="flex-1 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                >
+                  Tutup
+                </button>
+                {onSync && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSync();
+                      setShowSyncModal(false);
+                    }}
+                    disabled={isSyncing}
+                    className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    <ArrowPathIcon className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span>{isSyncing ? 'Menyelaraskan...' : 'Segerak Sekarang'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

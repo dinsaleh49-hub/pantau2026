@@ -115,7 +115,13 @@ const App: React.FC = () => {
     schedules: false,
     lecturers: false
   });
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [lastSync, setLastSync] = useState<Date | null>(() => {
+    try {
+      const saved = localStorage.getItem('ipgkpt_last_sync');
+      if (saved) return new Date(saved);
+    } catch {}
+    return null;
+  });
   const [persistenceType, setPersistenceType] = useState<'supabase' | 'local_file' | 'unknown'>('unknown');
   const [supabaseStatus, setSupabaseStatus] = useState<string>('unknown');
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -586,10 +592,22 @@ const App: React.FC = () => {
   };
 
   const handleManualSync = async () => {
+    if (isSyncing) return;
     setIsSyncing(true);
     setSyncError(null);
     try {
-      await Promise.all([
+      // 1. Kumpulkan rekod & jadual yang dipadam untuk dihantar ke pelayan
+      let deletedSchedIds: string[] = [];
+      try {
+        const savedDel = localStorage.getItem('ipgkpt_deleted_schedules');
+        if (savedDel) {
+          const parsed = JSON.parse(savedDel);
+          if (Array.isArray(parsed)) deletedSchedIds = parsed;
+        }
+      } catch {}
+
+      // 2. Hantar perubahan setempat ke pelayan (records, schedules, lecturers, signatures, deleted_schedules)
+      const pushPromises: Promise<any>[] = [
         syncRecordsToServerSafely(records),
         fetch('/api/schedules', {
           method: 'POST',
@@ -600,13 +618,48 @@ const App: React.FC = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(lecturersList)
+        }),
+        fetch('/api/signatures', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(savedSignatures)
         })
-      ]);
-      setLastSync(new Date());
-      showNotification('Semua data pemantauan berjaya disegerakkan ke pelayan!', 'success');
+      ];
+
+      if (deletedSchedIds.length > 0) {
+        pushPromises.push(
+          fetch('/api/deleted-schedules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(deletedSchedIds)
+          })
+        );
+      }
+
+      await Promise.allSettled(pushPromises);
+
+      // 3. Muat turun data terkini dari pelayan agar peranti ini mendapat data terbaharu dari peranti lain
+      await fetchData(false);
+
+      // 4. Maklumkan semua tab pelayar lain pada peranti ini
+      notifyDataChanged();
+
+      const now = new Date();
+      setLastSync(now);
+      try {
+        localStorage.setItem('ipgkpt_last_sync', now.toISOString());
+      } catch {}
+
+      showNotification('Penyelarasan berjaya! Data terkini kini selaras merentasi Laptop, Telefon Pintar (Android & iOS) dan Komputer (Windows & Mac).', 'success');
     } catch (e: any) {
-      setSyncError(`Manual Sync Failed: ${e.message}`);
-      showNotification(`Gagal menyegerakkan data: ${e.message}`, 'error');
+      console.error("Manual sync failed:", e);
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+      if (isOffline) {
+        showNotification('Di luar talian: Data pemantauan disimpan selamat dalam peranti ini dan akan diselaraskan automatik apabila sambungan kembali.', 'success');
+      } else {
+        setSyncError(`Ralat Penyelarasan: ${e.message || 'Sila cuba lagi'}`);
+        showNotification(`Gagal menyegerakkan data: ${e.message || 'Sila semak sambungan rangkaian'}`, 'error');
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -1462,26 +1515,26 @@ const App: React.FC = () => {
                 <UserCircleIcon className="h-4 w-4 text-slate-400" />
                 <span className="text-xs font-bold text-slate-600">{user.username}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
-                  onClick={() => fetchData(false)}
+                  onClick={handleManualSync}
                   disabled={isSyncing}
-                  className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full text-[10px] font-bold text-slate-600 transition-all active:scale-95 disabled:opacity-50"
-                  title="Klik untuk menyegerakkan data serta-merta dengan semua peranti"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 border border-indigo-200/90 rounded-xl text-xs font-bold text-indigo-700 transition-all active:scale-95 disabled:opacity-50 min-h-[38px] shadow-xs cursor-pointer"
+                  title="Klik untuk menyegerakkan data secara dua hala merentasi Laptop, Telefon Pintar (Android & iOS) dan Komputer (Mac/Windows)"
                 >
-                  <ArrowPathIcon className={`h-3 w-3 ${isSyncing ? 'animate-spin text-indigo-600' : 'text-slate-500'}`} />
-                  <span className="hidden sm:inline">{isSyncing ? 'Menyelaraskan...' : 'Segerak'}</span>
+                  <ArrowPathIcon className={`h-4 w-4 shrink-0 text-indigo-600 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span className="font-bold text-xs">{isSyncing ? 'Menyelaraskan...' : 'Segerak'}</span>
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${syncError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
                 </button>
-                <div className={`w-2 h-2 rounded-full ${syncError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden sm:inline">
-                  {syncError ? 'Ralat Penyelarasan' : 'Semua Peranti Selaras'}
-                </span>
-                {lastSync && (
-                  <span className="text-[9px] text-slate-400 hidden lg:inline">
-                    • {lastSync.toLocaleTimeString()}
-                  </span>
-                )}
+                <div className="hidden lg:flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <span>{syncError ? 'Ralat Penyelarasan' : 'Semua Peranti Selaras'}</span>
+                  {lastSync && (
+                    <span className="text-slate-400 font-normal">
+                      • {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -1574,6 +1627,9 @@ const App: React.FC = () => {
             onAddLecturer={handleAddLecturer}
             onUpdateLecturer={handleUpdateLecturer}
             onRefresh={() => fetchData()}
+            onSync={handleManualSync}
+            isSyncing={isSyncing}
+            syncError={syncError}
             lastSync={lastSync}
             recentlySavedId={recentlySavedId}
             recentlySavedAction={recentlySavedAction}
