@@ -293,10 +293,11 @@ const App: React.FC = () => {
         fetch('/api/lecturers'),
         fetch('/api/health'),
         fetch('/api/signatures'),
-        fetch('/api/deleted-schedules')
+        fetch('/api/deleted-schedules'),
+        fetch('/api/deleted-records')
       ]);
 
-      const [recordsSettled, schedulesSettled, lecturersSettled, healthSettled, signaturesSettled, deletedSchedsSettled] = results;
+      const [recordsSettled, schedulesSettled, lecturersSettled, healthSettled, signaturesSettled, deletedSchedsSettled, deletedRecsSettled] = results;
 
       let anySuccess = false;
 
@@ -328,6 +329,34 @@ const App: React.FC = () => {
         localStorage.setItem('ipgkpt_deleted_schedules', JSON.stringify(Array.from(deletedSchedIds)));
       } catch {}
 
+      // Parse server-side deleted evaluation record IDs for cross-device synchronization
+      const deletedRecordIds = new Set<string>();
+      try {
+        const savedDelR = localStorage.getItem('ipgkpt_deleted_records');
+        if (savedDelR) {
+          const parsedDelR = JSON.parse(savedDelR);
+          if (Array.isArray(parsedDelR)) {
+            parsedDelR.forEach((id: string) => deletedRecordIds.add(id));
+          }
+        }
+      } catch {}
+
+      if (deletedRecsSettled && deletedRecsSettled.status === 'fulfilled' && deletedRecsSettled.value.ok) {
+        try {
+          const serverDeletedRecs = await deletedRecsSettled.value.json();
+          if (Array.isArray(serverDeletedRecs)) {
+            serverDeletedRecs.forEach((id: string) => deletedRecordIds.add(id));
+          }
+        } catch (e) {
+          console.warn("Failed to parse deleted records data:", e);
+        }
+      }
+
+      // Persist the combined set of deleted record IDs back to localStorage
+      try {
+        localStorage.setItem('ipgkpt_deleted_records', JSON.stringify(Array.from(deletedRecordIds)));
+      } catch {}
+
       if (healthSettled.status === 'fulfilled' && healthSettled.value.ok) {
         anySuccess = true;
         try {
@@ -347,37 +376,32 @@ const App: React.FC = () => {
         try {
           const recordsData = await recordsSettled.value.json();
           if (Array.isArray(recordsData)) {
-            let deletedIds = new Set<string>();
-            try {
-              deletedIds = new Set<string>(JSON.parse(localStorage.getItem('ipgkpt_deleted_records') || '[]'));
-            } catch {}
-
-            // Server records
+            // Server records filtered by deletedRecordIds
             const cleanedServer = recordsData.filter((r: any) => 
-              r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7'
+              r && r.id && !deletedRecordIds.has(r.id) && r.id !== '9x1p9rsg7'
             );
             
-            // Read local records to preserve newly filled or updated evaluation forms
+            // Read and purge local records of any deleted IDs so deleted records NEVER resurrect across devices
             let localRecords: EvaluationRecord[] = [];
             try {
               const saved = localStorage.getItem('ipgkpt_records');
               if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed)) {
-                  localRecords = parsed.filter(r => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7');
+                  localRecords = parsed.filter(r => r && r.id && !deletedRecordIds.has(r.id) && r.id !== '9x1p9rsg7');
                 }
               }
             } catch {}
 
             const recMap = new Map<string, EvaluationRecord>();
-            cleanedServer.forEach(r => { if (r && r.id && !deletedIds.has(r.id)) recMap.set(r.id, r); });
+            cleanedServer.forEach(r => { if (r && r.id && !deletedRecordIds.has(r.id)) recMap.set(r.id, r); });
 
             let hasNewerLocal = false;
             localRecords.forEach(loc => {
-              if (!loc || !loc.id || deletedIds.has(loc.id)) return;
+              if (!loc || !loc.id || deletedRecordIds.has(loc.id)) return;
               const existing = recMap.get(loc.id);
               if (!existing) {
-                // Ensure filled form is KEPT permanently and not lost
+                // Only if newly added record locally that was NEVER deleted
                 recMap.set(loc.id, loc);
                 hasNewerLocal = true;
               } else if ((loc.timestamp || 0) > (existing.timestamp || 0)) {
@@ -606,7 +630,16 @@ const App: React.FC = () => {
         }
       } catch {}
 
-      // 2. Hantar perubahan setempat ke pelayan (records, schedules, lecturers, signatures, deleted_schedules)
+      let deletedRecIds: string[] = [];
+      try {
+        const savedDelR = localStorage.getItem('ipgkpt_deleted_records');
+        if (savedDelR) {
+          const parsed = JSON.parse(savedDelR);
+          if (Array.isArray(parsed)) deletedRecIds = parsed;
+        }
+      } catch {}
+
+      // 2. Hantar perubahan setempat ke pelayan (records, schedules, lecturers, signatures, deleted_schedules, deleted_records)
       const pushPromises: Promise<any>[] = [
         syncRecordsToServerSafely(records),
         fetch('/api/schedules', {
@@ -632,6 +665,16 @@ const App: React.FC = () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(deletedSchedIds)
+          })
+        );
+      }
+
+      if (deletedRecIds.length > 0) {
+        pushPromises.push(
+          fetch('/api/deleted-records', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(deletedRecIds)
           })
         );
       }
@@ -1194,6 +1237,7 @@ const App: React.FC = () => {
           localStorage.setItem('ipgkpt_records', JSON.stringify(INITIAL_RECORDS));
           localStorage.setItem('ipgkpt_schedules', JSON.stringify(INITIAL_SCHEDULES));
           localStorage.removeItem('ipgkpt_deleted_schedules');
+          localStorage.removeItem('ipgkpt_deleted_records');
           showNotification('Berjaya memulihkan 73 rekod pemantauan pensyarah (7.10.2026)!', 'success');
         } else {
           showNotification(`Gagal memulihkan: ${data.error || 'Ralat server'}`, 'error');
@@ -1204,6 +1248,7 @@ const App: React.FC = () => {
         localStorage.setItem('ipgkpt_records', JSON.stringify(INITIAL_RECORDS));
         localStorage.setItem('ipgkpt_schedules', JSON.stringify(INITIAL_SCHEDULES));
         localStorage.removeItem('ipgkpt_deleted_schedules');
+        localStorage.removeItem('ipgkpt_deleted_records');
         showNotification('Data 73 orang pensyarah berjaya dipulihkan.', 'success');
       } finally {
         setIsSyncing(false);
@@ -1230,11 +1275,17 @@ const App: React.FC = () => {
         }
       } catch {}
 
-      // Inform server of deleted ID immediately
+      // Inform server of deleted ID immediately (both to /api/records and to /api/deleted-records for cross-device tombstone)
       fetch('/api/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete_record', id: recordIdToDelete })
+      }).catch(console.warn);
+
+      fetch('/api/deleted-records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([recordIdToDelete])
       }).catch(console.warn);
 
       updatedRecords = records.filter((r: EvaluationRecord) => r.id !== recordIdToDelete);
@@ -1272,7 +1323,7 @@ const App: React.FC = () => {
       try {
         localStorage.setItem('ipgkpt_records', JSON.stringify(updatedRecords));
       } catch {}
-      showNotification(`Rekod pemantauan bagi ${deletedRecord?.lecturerName || 'pensyarah'} berjaya dipadam.`, 'success');
+      showNotification(`Rekod pemantauan bagi ${deletedRecord?.lecturerName || 'pensyarah'} berjaya dipadam dan diselaraskan ke semua peranti.`, 'success');
     } else if (confirmModal.type === 'multiple_records' && confirmModal.targetRecordIds) {
       const idsToDelete = new Set(confirmModal.targetRecordIds);
       const deletedRecordsList = records.filter(r => idsToDelete.has(r.id));
@@ -1286,11 +1337,17 @@ const App: React.FC = () => {
         localStorage.setItem('ipgkpt_deleted_records', JSON.stringify(existingDeleted));
       } catch {}
 
-      // Inform server of deleted IDs
+      // Inform server of deleted IDs (both to /api/records and to /api/deleted-records for cross-device tombstone)
       fetch('/api/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete_records', ids: confirmModal.targetRecordIds })
+      }).catch(console.warn);
+
+      fetch('/api/deleted-records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(confirmModal.targetRecordIds)
       }).catch(console.warn);
 
       updatedRecords = records.filter((r: EvaluationRecord) => !idsToDelete.has(r.id));

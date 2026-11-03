@@ -28,6 +28,7 @@ const SCHEDULES_FILE = path.join(DATA_DIR, "schedules.json");
 const LECTURERS_FILE = path.join(DATA_DIR, "lecturers.json");
 const SIGNATURES_FILE = path.join(DATA_DIR, "signatures.json");
 const DELETED_SCHEDULES_FILE = path.join(DATA_DIR, "deleted_schedules.json");
+const DELETED_RECORDS_FILE = path.join(DATA_DIR, "deleted_records.json");
 const INITIAL_RECORDS_FILE = path.join(DATA_DIR, "initial_records.json");
 const INITIAL_SCHEDULES_FILE = path.join(DATA_DIR, "initial_schedules.json");
 const INITIAL_LECTURERS_FILE = path.join(DATA_DIR, "initial_lecturers.json");
@@ -67,6 +68,9 @@ if (!process.env.VERCEL) {
     }
     if (!fs.existsSync(DELETED_SCHEDULES_FILE)) {
       fs.writeFileSync(DELETED_SCHEDULES_FILE, JSON.stringify([], null, 2));
+    }
+    if (!fs.existsSync(DELETED_RECORDS_FILE)) {
+      fs.writeFileSync(DELETED_RECORDS_FILE, JSON.stringify([], null, 2));
     }
   } catch (initErr: any) {
     console.warn(`[API] Could not initialize default JSON files:`, initErr.message);
@@ -126,8 +130,67 @@ const getHealth = async (req: any, res: any) => {
   });
 };
 
+// Helper functions for deleted records tombstone persistence across all devices
+const getDeletedRecordsList = async (): Promise<string[]> => {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('epantau_storage').select('content').eq('id', 'deleted_records').maybeSingle();
+      if (Array.isArray(data?.content)) {
+        if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+          try { fs.writeFileSync(DELETED_RECORDS_FILE, JSON.stringify(data.content, null, 2)); } catch {}
+        }
+        return data.content;
+      }
+    } catch (e) {
+      console.warn("[API] Supabase read error for deleted_records:", e);
+    }
+  }
+  if (fs.existsSync(DELETED_RECORDS_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(DELETED_RECORDS_FILE, 'utf-8'));
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return [];
+};
+
+const saveDeletedRecordsList = async (ids: string[]): Promise<void> => {
+  const uniqueIds = Array.from(new Set(ids));
+  if (supabase) {
+    try {
+      await supabase.from('epantau_storage').upsert({ id: 'deleted_records', content: uniqueIds, updated_at: new Date() });
+    } catch (e) {
+      console.error("[API] Supabase write error for deleted_records:", e);
+    }
+  }
+  if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
+    try {
+      fs.writeFileSync(DELETED_RECORDS_FILE, JSON.stringify(uniqueIds, null, 2));
+    } catch {}
+  }
+};
+
+const getDeletedRecords = async (req: any, res: any) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  const ids = await getDeletedRecordsList();
+  res.json(ids);
+};
+
+const postDeletedRecords = async (req: any, res: any) => {
+  const incomingIds = Array.isArray(req.body?.ids) ? req.body.ids : (Array.isArray(req.body) ? req.body : []);
+  if (incomingIds.length === 0) {
+    return res.json({ success: true, count: 0 });
+  }
+  const current = await getDeletedRecordsList();
+  const merged = Array.from(new Set([...current, ...incomingIds]));
+  await saveDeletedRecordsList(merged);
+  res.json({ success: true, count: merged.length, deletedIds: merged });
+};
+
 const getRecords = async (req: any, res: any) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  const deletedIds = new Set(await getDeletedRecordsList());
+
   if (supabase) {
     try {
       const { data, error } = await supabase.from('epantau_storage').select('content').eq('id', 'records').maybeSingle();
@@ -137,24 +200,26 @@ const getRecords = async (req: any, res: any) => {
       }
       const recs = data?.content;
       if (Array.isArray(recs) && recs.length > 0) {
+        const cleaned = recs.filter((r: any) => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7');
         if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
           try {
-            fs.writeFileSync(RECORDS_FILE, JSON.stringify(recs, null, 2));
+            fs.writeFileSync(RECORDS_FILE, JSON.stringify(cleaned, null, 2));
           } catch {}
         }
-        return res.json(recs);
+        return res.json(cleaned);
       }
       // If Supabase returned empty, restore from initial_records.json (73 records)
       if (fs.existsSync(INITIAL_RECORDS_FILE)) {
         const initial = JSON.parse(fs.readFileSync(INITIAL_RECORDS_FILE, "utf-8"));
         if (Array.isArray(initial) && initial.length > 0) {
-          console.log("[API] Seeding Supabase records with initial 73 records...");
+          const cleaned = initial.filter((r: any) => r && r.id && !deletedIds.has(r.id) && r.id !== '9x1p9rsg7');
+          console.log("[API] Seeding Supabase records with initial records (excluding deleted)...");
           try {
-            await supabase.from('epantau_storage').upsert({ id: 'records', content: initial, updated_at: new Date() });
+            await supabase.from('epantau_storage').upsert({ id: 'records', content: cleaned, updated_at: new Date() });
           } catch (upsertErr) {
             console.error("[API] Error seeding Supabase records:", upsertErr);
           }
-          return res.json(initial);
+          return res.json(cleaned);
         }
       }
       return res.json([]);
@@ -162,7 +227,10 @@ const getRecords = async (req: any, res: any) => {
       console.error("[API] Exception fetching records from Supabase:", err);
       if (fs.existsSync(RECORDS_FILE)) {
         try {
-          return res.json(JSON.parse(fs.readFileSync(RECORDS_FILE, "utf-8")));
+          const parsed = JSON.parse(fs.readFileSync(RECORDS_FILE, "utf-8"));
+          if (Array.isArray(parsed)) {
+            return res.json(parsed.filter((r: any) => r && r.id && !deletedIds.has(r.id)));
+          }
         } catch {}
       }
       return res.status(500).json({ error: err.message });
@@ -173,12 +241,12 @@ const getRecords = async (req: any, res: any) => {
         const content = fs.readFileSync(RECORDS_FILE, "utf-8");
         const parsed = JSON.parse(content);
         if (Array.isArray(parsed)) {
-          return res.json(parsed);
+          return res.json(parsed.filter((r: any) => r && r.id && !deletedIds.has(r.id)));
         }
       }
       if (fs.existsSync(INITIAL_RECORDS_FILE)) {
         const initial = JSON.parse(fs.readFileSync(INITIAL_RECORDS_FILE, "utf-8"));
-        return res.json(initial);
+        return res.json(initial.filter((r: any) => r && r.id && !deletedIds.has(r.id)));
       }
       res.json([]);
     } catch (e: any) { 
@@ -324,6 +392,12 @@ const postRecords = async (req: any, res: any) => {
       } catch {}
     }
 
+    // If this record was previously marked as deleted, unmark it so it can be saved/updated
+    const currentDeleted = await getDeletedRecordsList();
+    if (currentDeleted.includes(singleRecord.id)) {
+      await saveDeletedRecordsList(currentDeleted.filter(id => id !== singleRecord.id));
+    }
+
     const recIdx = currentRecords.findIndex((r: any) => r.id === singleRecord.id);
     if (recIdx !== -1) {
       currentRecords[recIdx] = singleRecord;
@@ -352,7 +426,13 @@ const postRecords = async (req: any, res: any) => {
     const idsToDelete = new Set<string>(
       body.action === 'delete_records' && Array.isArray(body.ids) ? body.ids : [body.id]
     );
-    console.log(`[API] POST /api/records - Deleting ${idsToDelete.size} records...`);
+    console.log(`[API] POST /api/records - Deleting ${idsToDelete.size} records and updating tombstones...`);
+
+    // Persist deleted IDs to deleted_records tombstone so they never resurrect across devices
+    const currentDeleted = await getDeletedRecordsList();
+    const updatedDeleted = Array.from(new Set([...currentDeleted, ...Array.from(idsToDelete)]));
+    await saveDeletedRecordsList(updatedDeleted);
+
     let currentRecords: any[] = [];
     if (supabase) {
       try {
@@ -380,13 +460,15 @@ const postRecords = async (req: any, res: any) => {
         fs.writeFileSync(RECORDS_FILE, JSON.stringify(filtered, null, 2));
       } catch {}
     }
-    return res.json({ success: true, count: filtered.length });
+    return res.json({ success: true, count: filtered.length, deletedCount: idsToDelete.size });
   }
 
   // Case D: Standard array of records
-  const records = body;
-  const count = Array.isArray(records) ? records.length : 0;
-  console.log(`[API] POST /api/records - Saving ${count} records (full array)...`);
+  const deletedIds = new Set(await getDeletedRecordsList());
+  const incomingRecords = Array.isArray(body) ? body : [];
+  const records = incomingRecords.filter((r: any) => r && r.id && !deletedIds.has(r.id));
+  const count = records.length;
+  console.log(`[API] POST /api/records - Saving ${count} records (full array, excluding deleted tombstones)...`);
   
   if (!Array.isArray(records)) {
     console.error("[API] Invalid records payload: not an array");
@@ -957,8 +1039,9 @@ const postRestore = async (req: any, res: any) => {
       ? JSON.parse(fs.readFileSync(INITIAL_SCHEDULES_FILE, "utf-8"))
       : [];
 
-    // Clear deleted tombstones so restored schedules can be viewed on all devices
+    // Clear deleted tombstones so restored schedules and records can be viewed on all devices
     await saveDeletedSchedulesList([]);
+    await saveDeletedRecordsList([]);
 
     if (!process.env.VERCEL && fs.existsSync(DATA_DIR)) {
       fs.writeFileSync(RECORDS_FILE, JSON.stringify(initialRecords, null, 2));
@@ -974,6 +1057,7 @@ const postRestore = async (req: any, res: any) => {
           await supabase.from('epantau_storage').upsert({ id: 'schedules', content: initialSchedules, updated_at: new Date() });
         }
         await supabase.from('epantau_storage').upsert({ id: 'deleted_schedules', content: [], updated_at: new Date() });
+        await supabase.from('epantau_storage').upsert({ id: 'deleted_records', content: [], updated_at: new Date() });
         console.log("[API] Records and schedules successfully restored to Supabase.");
       } catch (sbErr: any) {
         console.error("[API] Error restoring records to Supabase:", sbErr);
@@ -1006,6 +1090,11 @@ app.get("/api/records", getRecords);
 app.get("/records", getRecords);
 app.post("/api/records", postRecords);
 app.post("/records", postRecords);
+
+app.get("/api/deleted-records", getDeletedRecords);
+app.get("/deleted-records", getDeletedRecords);
+app.post("/api/deleted-records", postDeletedRecords);
+app.post("/deleted-records", postDeletedRecords);
 
 app.get("/api/schedules", getSchedules);
 app.get("/schedules", getSchedules);
